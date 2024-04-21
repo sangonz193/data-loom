@@ -190,13 +190,7 @@ export const connectCallerPeerMachine = setup({
     },
 
     "setting remote answer": {
-      entry: [
-        sendTo("someActor", ({ context }) => ({
-          type: "someEvent",
-          data: context.answer!,
-        })),
-        "sendPendingIceCandidates",
-      ],
+      entry: "sendPendingIceCandidates",
 
       on: {
         "peer-connection.ice-candidate": {
