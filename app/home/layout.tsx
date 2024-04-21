@@ -1,16 +1,17 @@
 import { PropsWithChildren } from "react"
 
 import { Header } from "@/components/header"
+import { RequiredAuthClient } from "@/modules/auth/required"
 
 import { assertUser } from "../utils/user-session"
 
 export default async function Layout({ children }: PropsWithChildren) {
-  await assertUser()
+  const user = await assertUser()
 
   return (
-    <div>
+    <RequiredAuthClient user={user}>
       <Header />
       {children}
-    </div>
+    </RequiredAuthClient>
   )
 }

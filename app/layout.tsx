@@ -5,6 +5,7 @@ import { GeistSans } from "geist/font/sans"
 import { PropsWithChildren } from "react"
 
 import { cn } from "@/lib/cn"
+import { AuthProvider } from "@/modules/auth/provider/server"
 import { themeClassNames } from "@/styles/themeClasses"
 import { ReactQueryProvider } from "@/utils/react-query/provider"
 
@@ -25,7 +26,9 @@ export default function RootLayout({ children }: PropsWithChildren) {
         className={cn("bg-background text-foreground", themeClassNames.default)}
       >
         <main className="min-h-screen bg-background">
-          <ReactQueryProvider>{children}</ReactQueryProvider>
+          <ReactQueryProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </ReactQueryProvider>
         </main>
       </body>
     </html>

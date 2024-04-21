@@ -1,6 +1,5 @@
 "use client"
 
-import { User } from "@supabase/supabase-js"
 import { useMachine } from "@xstate/react"
 import { PlusCircleIcon } from "lucide-react"
 
@@ -12,7 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Spinner } from "@/components/ui/spinner"
-import { useUserQuery } from "@/modules/auth/use-user"
+import { useRequiredUser } from "@/modules/auth/use-user"
 import { createClient } from "@/utils/supabase/client"
 
 import { DisplayCode } from "./display-code"
@@ -25,8 +24,6 @@ type Props = {
 }
 
 export function CreateConnectionDialog({ className }: Props) {
-  const user = useUserQuery().data
-
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -37,13 +34,14 @@ export function CreateConnectionDialog({ className }: Props) {
       </DialogTrigger>
 
       <DialogContent className="gap-8">
-        {user && <Content user={user} />}
+        <Content />
       </DialogContent>
     </Dialog>
   )
 }
 
-function Content({ user }: { user: User }) {
+function Content() {
+  const user = useRequiredUser()
   const supabase = createClient()
   const [state, send] = useMachine(newConnectionMachine, {
     input: {

@@ -1,15 +1,10 @@
-import { useQuery } from "@tanstack/react-query"
+import { useAuthContext } from "./provider/client"
+import { useRequiredAuth } from "./required"
 
-import { createClient } from "@/utils/supabase/client"
+export function useUser() {
+  return useAuthContext().user
+}
 
-export function useUserQuery() {
-  const supabase = createClient()
-  const query = useQuery({
-    queryKey: ["user"],
-    queryFn: async () => {
-      return (await supabase.auth.getUser()).data.user
-    },
-  })
-
-  return query
+export function useRequiredUser() {
+  return useRequiredAuth().user
 }
