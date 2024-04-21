@@ -43,6 +43,17 @@ export function DisplayCode(props: Props) {
   const duration = intervalToDuration(interval(new Date(), expiresAt))
   const isExpired = milliseconds(duration) <= 0
 
+  const [, setTick] = useState(false)
+  useEffect(() => {
+    if (isExpired) return
+
+    const interval = setInterval(() => {
+      setTick((tick) => !tick)
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [isExpired])
+
   return (
     <div className="gap-3">
       <span
@@ -92,17 +103,6 @@ function ExpNotice({
   duration: Duration
   isExpired: boolean
 }) {
-  const [, setTick] = useState(false)
-  useEffect(() => {
-    if (isExpired) return
-
-    const interval = setInterval(() => {
-      setTick((tick) => !tick)
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [isExpired])
-
   if (isExpired) {
     return (
       <span className="mt-4 text-red-500">
