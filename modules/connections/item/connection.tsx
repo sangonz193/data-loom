@@ -22,9 +22,9 @@ import { connectionMachine } from "./machine"
 import { Button } from "../../../components/ui/button"
 import { useRequiredUser } from "../../auth/use-user"
 import { DeleteConnection } from "../delete-connection"
-import { IncomingConnections } from "../incoming-connections"
+import { IncomingFileSharingRequests } from "../file-sharing-requests/incoming-file-sharing-requests"
+import { ListenToFileRequestTableOutputEvent } from "../file-sharing-requests/listen-to-file-request-table"
 import { useUserConnectionsQuery } from "../use-user-connections"
-import { WebRtcSignalsOutputEvent } from "../web-rtc-signals"
 
 type Props = {
   connection: NonNullable<
@@ -59,28 +59,28 @@ export function Connection({ connection }: Props) {
     },
   })
 
-  const incomingConnectionsRef = IncomingConnections.useActorRef()
+  const incomingFileSharingRequestsRef =
+    IncomingFileSharingRequests.useActorRef()
 
   useEffect(() => {
-    const handler = (event: WebRtcSignalsOutputEvent) => {
-      if (event.type === "signals.offer")
-        send({ type: "connection-request-received", offer: event.offer })
+    const handler = (event: ListenToFileRequestTableOutputEvent) => {
+      send({ type: "connection-request-received", request: event.fileRequest })
     }
 
-    incomingConnectionsRef.send({
+    incomingFileSharingRequestsRef.send({
       type: "register-handler",
       remoteUserId,
       handler,
     })
 
     return () => {
-      incomingConnectionsRef.send({
+      incomingFileSharingRequestsRef.send({
         type: "unregister-handler",
         remoteUserId,
         handler,
       })
     }
-  }, [incomingConnectionsRef, remoteUserId, send])
+  }, [incomingFileSharingRequestsRef, remoteUserId, send])
 
   return (
     <div

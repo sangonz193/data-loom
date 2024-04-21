@@ -28,7 +28,7 @@ export type Database = MergeDeep<
   Generated.Database,
   {
     public: {
-      tables: {
+      Tables: {
         animals: {
           Row: {
             id: AnimalId

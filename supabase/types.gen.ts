@@ -67,6 +67,71 @@ export type Database = {
         }
         Relationships: []
       }
+      file_sharing_request: {
+        Row: {
+          created_at: string
+          from_user_id: string
+          id: string
+          payload: Json
+          to_user_id: string
+        }
+        Insert: {
+          created_at?: string
+          from_user_id: string
+          id?: string
+          payload: Json
+          to_user_id: string
+        }
+        Update: {
+          created_at?: string
+          from_user_id?: string
+          id?: string
+          payload?: Json
+          to_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "file_sharing_request_from_user_id_fkey"
+            columns: ["from_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "file_sharing_request_to_user_id_fkey"
+            columns: ["to_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      file_sharing_request_response: {
+        Row: {
+          accepted: boolean
+          created_at: string
+          request_id: string
+        }
+        Insert: {
+          accepted: boolean
+          created_at?: string
+          request_id: string
+        }
+        Update: {
+          accepted?: boolean
+          created_at?: string
+          request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "file_sharing_request_response_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: true
+            referencedRelation: "file_sharing_request"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pairing_code_redemptions: {
         Row: {
           created_at: string

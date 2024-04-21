@@ -11,7 +11,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Tables, TablesInsert } from "@/supabase/types"
 import { createClient } from "@/utils/supabase/client"
 
@@ -51,6 +51,7 @@ export function DeleteConnection({ connection }: Props) {
                   user_2_id: connection.user_2_id,
                 } satisfies TablesInsert<"user_connections">)
             }}
+            className={buttonVariants({ variant: "destructive" })}
           >
             Delete
           </AlertDialogAction>
