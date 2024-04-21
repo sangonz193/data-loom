@@ -196,10 +196,18 @@ export const connectionMachine = setup({
 
         "connection-request-received": {
           target: "prompting user to accept connection",
-          actions: {
-            type: "setRequestId",
-            params: ({ event }) => event.request.id,
-          },
+          actions: [
+            {
+              type: "setRequestId",
+              params: ({ event }) => event.request.id,
+            },
+            {
+              type: "setFileMetadataToContext",
+              params: ({ event }) =>
+                (event.request.payload as z.infer<typeof requestPayloadSchema>)
+                  .file,
+            },
+          ],
         },
 
         "clear-file-metadata": {

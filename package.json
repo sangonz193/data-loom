@@ -22,6 +22,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "date-fns": "^3.6.0",
+    "filesize": "^10.1.1",
     "geist": "^1.2.1",
     "lucide-react": "^0.372.0",
     "native-file-system-adapter": "^3.0.1",

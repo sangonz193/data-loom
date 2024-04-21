@@ -1,4 +1,5 @@
 import { useMachine } from "@xstate/react"
+import { filesize } from "filesize"
 import { SendIcon, XIcon } from "lucide-react"
 import { useEffect, useRef } from "react"
 import { useDropzone } from "react-dropzone"
@@ -131,13 +132,23 @@ export function Connection({ connection }: Props) {
           <AlertDialog open>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Accept the file?</AlertDialogTitle>
+                <AlertDialogTitle>
+                  File Transfer request from{" "}
+                  {getUserName({
+                    colorLabel: remoteUser?.colors?.label,
+                    animalLabel: remoteUser?.animals?.label,
+                  })}
+                </AlertDialogTitle>
                 <AlertDialogDescription>
                   {getUserName({
                     colorLabel: remoteUser?.colors?.label,
                     animalLabel: remoteUser?.animals?.label,
                   })}{" "}
-                  wants to send you a file. Do you want to accept it?
+                  is sending you {'"'}
+                  {state.context.fileSharingState?.metadata.name}
+                  {'"'} (
+                  {filesize(state.context.fileSharingState?.metadata.size || 0)}
+                  ). Do you want to accept it?
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
