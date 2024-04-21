@@ -4,9 +4,18 @@ import { z } from "zod"
 
 import { logger } from "@/logger"
 
-export type ReceiveFileOutputEvent = {
-  type: "receive-file.done"
-}
+export type ReceiveFileOutputEvent =
+  | {
+      type: "receive-file.done"
+    }
+  | {
+      type: "receive-file.metadata"
+      metadata: z.infer<typeof fileMetadataSchema>
+    }
+  | {
+      type: "receive-file.progress"
+      receivedBytes: number
+    }
 
 export const fileMetadataSchema = z.object({
   name: z.string(),
@@ -35,6 +44,7 @@ export const receiveFile = fromCallback<
         `[receive-file] Received ${receivedBytes} of ${metadata.size} bytes`,
       )
       writer.write(e.data)
+      sendBack({ type: "receive-file.progress", receivedBytes })
 
       if (receivedBytes >= metadata.size) {
         logger.info("[receive-file] Finished receiving file")
@@ -51,6 +61,7 @@ export const receiveFile = fromCallback<
       metadata = fileMetadataSchema.parse(parsedData)
       writer.setMetadata(metadata)
       logger.info("[receive-file] Received metadata", metadata)
+      sendBack({ type: "receive-file.metadata", metadata })
     } catch (error) {
       logger.error("[receive-file] Error parsing metadata", error)
     }

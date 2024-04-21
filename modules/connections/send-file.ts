@@ -12,8 +12,19 @@ type Input = {
   file: File
 }
 
-export const sendFile = fromCallback<{ type: "noop" }, Input>(({ input }) => {
-  const { peerConnection, file } = input
+export type SendFileOutputEvent =
+  | {
+      type: "send-file.metadata"
+      metadata: z.infer<typeof fileMetadataSchema>
+    }
+  | {
+      type: "send-file.progress"
+      sentBytes: number
+    }
+
+export const sendFile = fromCallback<{ type: "noop" }, Input>((params) => {
+  const sendBack = params.sendBack as (event: SendFileOutputEvent) => void
+  const { peerConnection, file } = params.input
 
   logger.info("[send-file] creating dataChannel")
   const dataChannel = peerConnection.createDataChannel("file")
@@ -37,6 +48,7 @@ export const sendFile = fromCallback<{ type: "noop" }, Input>(({ input }) => {
       `[send-file] sending chunk ${Math.min(cursor, file.size)} / ${file.size}`,
     )
     dataChannel.send(chunk)
+    sendBack({ type: "send-file.progress", sentBytes: cursor })
 
     if (cursor >= file.size) {
       return
@@ -56,6 +68,7 @@ export const sendFile = fromCallback<{ type: "noop" }, Input>(({ input }) => {
     }
     logger.info("[send-file] sending metadata", metadata)
     dataChannel.send(JSON.stringify(metadata))
+    sendBack({ type: "send-file.metadata", metadata })
     readChunk()
   }
 

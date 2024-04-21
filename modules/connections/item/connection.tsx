@@ -1,4 +1,5 @@
 import { useMachine } from "@xstate/react"
+import { XIcon } from "lucide-react"
 import { useEffect, useRef } from "react"
 
 import { Avatar, getUserName } from "@/components/avatar"
@@ -16,13 +17,13 @@ import { cn } from "@/lib/cn"
 import { themeClassNames } from "@/styles/themeClasses"
 import { createClient } from "@/utils/supabase/client"
 
-import { DeleteConnection } from "./delete-connection"
-import { IncomingConnections } from "./incoming-connections"
-import { connectionMachine } from "./item/machine"
-import { useUserConnectionsQuery } from "./use-user-connections"
-import { WebRtcSignalsOutputEvent } from "./web-rtc-signals"
-import { Button } from "../../components/ui/button"
-import { useRequiredUser } from "../auth/use-user"
+import { connectionMachine } from "./machine"
+import { Button } from "../../../components/ui/button"
+import { useRequiredUser } from "../../auth/use-user"
+import { DeleteConnection } from "../delete-connection"
+import { IncomingConnections } from "../incoming-connections"
+import { useUserConnectionsQuery } from "../use-user-connections"
+import { WebRtcSignalsOutputEvent } from "../web-rtc-signals"
 
 type Props = {
   connection: NonNullable<
@@ -73,7 +74,7 @@ export function Connection({ connection }: Props) {
   return (
     <div
       className={cn(
-        "rounded-md border border-primary/50 bg-card p-4",
+        "gap-3 rounded-md border border-primary/50 bg-card p-4",
         themeClassNames[
           (remoteUser?.color_id as keyof typeof themeClassNames) || "default"
         ],
@@ -93,6 +94,18 @@ export function Connection({ connection }: Props) {
               animalLabel: remoteUser?.animals?.label,
             })}
           </h2>
+
+          {(state.value === "connecting" ||
+            state.value === "connecting with caller") && (
+            <span className="animate-pulse text-muted-foreground">
+              Connecting...
+            </span>
+          )}
+
+          {(state.value === "sending file" ||
+            state.value === "receiving file") && (
+            <span className="text-green-500/50">Connected</span>
+          )}
         </div>
 
         <input
@@ -133,6 +146,33 @@ export function Connection({ connection }: Props) {
         )}
       </div>
 
+      {state.context.fileSharingState && (
+        <div className="relative overflow-hidden rounded-md bg-accent">
+          <div
+            className="absolute bottom-0 left-0 top-0 bg-green-500/50 transition-[width]"
+            style={{
+              width: `${getProgressPercentage(state.context.fileSharingState.transferredBytes, state.context.fileSharingState.metadata.size)}%`,
+            }}
+          />
+
+          <div className="relative flex-row items-center px-3 py-1">
+            <span className="grow">
+              {state.context.fileSharingState.metadata?.name}
+            </span>
+
+            {state.can({ type: "clear-file-metadata" }) && (
+              <Button
+                onClick={() => send({ type: "clear-file-metadata" })}
+                size="icon"
+                variant="secondary"
+              >
+                <XIcon />
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex-row-reverse gap-3">
         <DeleteConnection connection={connection} />
 
@@ -144,4 +184,11 @@ export function Connection({ connection }: Props) {
       </div>
     </div>
   )
+}
+
+function getProgressPercentage(
+  transferredBytes: number,
+  totalBytes: number,
+): number {
+  return (transferredBytes / totalBytes) * 100
 }

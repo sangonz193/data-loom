@@ -2,7 +2,7 @@
 
 import { Spinner } from "@/components/ui/spinner"
 
-import { Connection } from "./connection"
+import { Connection } from "./item/connection"
 import {
   useInvalidateUserConnectionsQuery,
   useUserConnectionsQuery,
