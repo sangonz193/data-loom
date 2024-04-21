@@ -1,6 +1,6 @@
-import Link from "next/link";
+import Link from "next/link"
 
-import Step from "./Step";
+import Step from "./Step"
 
 export default function SignUpUserSteps() {
   return (
@@ -10,7 +10,7 @@ export default function SignUpUserSteps() {
           Head over to the{" "}
           <Link
             href="/login"
-            className="font-bold hover:underline text-foreground/80"
+            className="font-bold text-foreground/80 hover:underline"
           >
             Login
           </Link>{" "}
@@ -19,5 +19,5 @@ export default function SignUpUserSteps() {
         </p>
       </Step>
     </ol>
-  );
+  )
 }

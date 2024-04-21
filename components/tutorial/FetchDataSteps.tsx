@@ -1,5 +1,5 @@
-import Code from "./Code";
-import Step from "./Step";
+import Code from "./Code"
+import Step from "./Step"
 
 const create = `
 create table notes (
@@ -12,7 +12,7 @@ values
   ('Today I created a Supabase project.'),
   ('I added some data and queried it from Next.js.'),
   ('It was awesome!');
-`.trim();
+`.trim()
 
 const server = `
 import { createClient } from '@/utils/supabase/server'
@@ -23,7 +23,7 @@ export default async function Page() {
 
   return <pre>{JSON.stringify(notes, null, 2)}</pre>
 }
-`.trim();
+`.trim()
 
 const client = `
 'use client'
@@ -45,7 +45,7 @@ export default function Page() {
 
   return <pre>{JSON.stringify(notes, null, 2)}</pre>
 }
-`.trim();
+`.trim()
 
 export default function FetchDataSteps() {
   return (
@@ -55,7 +55,7 @@ export default function FetchDataSteps() {
           Head over to the{" "}
           <a
             href="https://supabase.com/dashboard/project/_/editor"
-            className="font-bold hover:underline text-foreground/80"
+            className="font-bold text-foreground/80 hover:underline"
             target="_blank"
             rel="noreferrer"
           >
@@ -66,7 +66,7 @@ export default function FetchDataSteps() {
           following into the{" "}
           <a
             href="https://supabase.com/dashboard/project/_/sql/new"
-            className="font-bold hover:underline text-foreground/80"
+            className="font-bold text-foreground/80 hover:underline"
             target="_blank"
             rel="noreferrer"
           >
@@ -81,7 +81,7 @@ export default function FetchDataSteps() {
         <p>
           To create a Supabase client and query data from an Async Server
           Component, create a new page.tsx file at{" "}
-          <span className="px-2 py-1 rounded-md bg-foreground/20 text-foreground/80">
+          <span className="rounded-md bg-foreground/20 px-2 py-1 text-foreground/80">
             /app/notes/page.tsx
           </span>{" "}
           and add the following.
@@ -95,5 +95,5 @@ export default function FetchDataSteps() {
         <p>You&apos;re ready to launch your product to the world! 🚀</p>
       </Step>
     </ol>
-  );
+  )
 }

@@ -1,4 +1,4 @@
-import Step from "./Step";
+import Step from "./Step"
 
 export default function ConnectSupabaseSteps() {
   return (
@@ -9,7 +9,7 @@ export default function ConnectSupabaseSteps() {
           <a
             href="https://app.supabase.com/project/_/settings/api"
             target="_blank"
-            className="font-bold hover:underline text-foreground/80"
+            className="font-bold text-foreground/80 hover:underline"
             rel="noreferrer"
           >
             database.new
@@ -21,18 +21,18 @@ export default function ConnectSupabaseSteps() {
       <Step title="Declare environment variables">
         <p>
           Rename the{" "}
-          <span className="px-2 py-1 rounded-md bg-foreground/20 text-foreground/80">
+          <span className="rounded-md bg-foreground/20 px-2 py-1 text-foreground/80">
             .env.example
           </span>{" "}
           file in your Next.js app to{" "}
-          <span className="px-2 py-1 rounded-md bg-foreground/20 text-foreground/80">
+          <span className="rounded-md bg-foreground/20 px-2 py-1 text-foreground/80">
             .env.local
           </span>{" "}
           and populate with values from{" "}
           <a
             href="https://app.supabase.com/project/_/settings/api"
             target="_blank"
-            className="font-bold hover:underline text-foreground/80"
+            className="font-bold text-foreground/80 hover:underline"
             rel="noreferrer"
           >
             your Supabase project&apos;s API Settings
@@ -44,7 +44,7 @@ export default function ConnectSupabaseSteps() {
       <Step title="Restart your Next.js development server">
         <p>
           You may need to quit your Next.js development server and run{" "}
-          <span className="px-2 py-1 rounded-md bg-foreground/20 text-foreground/80">
+          <span className="rounded-md bg-foreground/20 px-2 py-1 text-foreground/80">
             npm run dev
           </span>{" "}
           again to load the new environment variables.
@@ -58,5 +58,5 @@ export default function ConnectSupabaseSteps() {
         </p>
       </Step>
     </ol>
-  );
+  )
 }
