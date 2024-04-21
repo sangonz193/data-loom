@@ -24,7 +24,7 @@ export const listenToFileRequestResponseTable = fromCallback<
   const { supabase, requestId } = params.input
 
   const channel = supabase
-    .channel("file_requests")
+    .channel("file_requests_response")
     .on(
       "postgres_changes",
       {

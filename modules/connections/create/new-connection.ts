@@ -214,7 +214,6 @@ export const newConnectionMachine = setup({
 
         onDone: {
           target: "creating user connection",
-          reenter: true,
         },
       },
     },

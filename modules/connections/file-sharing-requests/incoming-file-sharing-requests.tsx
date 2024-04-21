@@ -88,7 +88,7 @@ const incomingFileSharingRequestsMachine = setup({
     listenToFileRequestTable: listenToFileRequestTable,
   },
 }).createMachine({
-  /** @xstate-layout N4IgpgJg5mDOIC5gF8A0IB2B7CdGgEsMBjLAWyKgFoAzAgGzCtgAsBDAJ0qo7AEcArnAAu8JCAAOWWAWEEsGfCAAeiAIwAmdAE91G5AeRA */
+  /** @xstate-layout N4IgpgJg5mDOIC5QEsB2BjA9gWzVAtAGbIA2Y+sAFgIYBOe+tYAjgK5wAusAxE1MrA5ha+GqghlaAbQAMAXUSgADpljIOyTKkUgAHogCMAJgBsAOgAcJgMxGAnCYCsMiwHYLdmSYA0IAJ6IRjIALGaeJkaOAL5RvmhYuKgExGQUNPRJjCzsgjysqHwCQiJiEsKyCkggKmoaWjr6CAYGrmau1iEWwTIu7uG+AU0uZsGO1sbRsSDxOAwp5FR0DExsnDzzWauCZgBUFTo16praVY0G1qGuBsEWjp69Hl4DhkYxU6iYEHA6M4nJpAt0stsmsDqojvVToZXM8EPZzLc7NZXJM4hhZpkNosMgQVjkuGYSEUwKg8GDascGognLDRjIzNY7sjJjEgA */
   id: "incoming-file-sharing-requests",
 
   context: ({ input }) => ({ ...input, handlers: {} }),
@@ -99,6 +99,12 @@ const incomingFileSharingRequestsMachine = setup({
     input: ({ context }) => ({
       ...context,
     }),
+  },
+
+  initial: "listening",
+
+  states: {
+    listening: {},
   },
 
   on: {

@@ -173,7 +173,7 @@ export const connectionMachine = setup({
       event.response.accepted,
   },
 }).createMachine({
-  /** @xstate-layout N4IgpgJg5mDOIC5QGMD2A7dZkBcCWGAdHhADZgDEsY6EAtAGZ7kDaADALqKgAOqsefBm4gAHogBMAZgkAOQgFYAjAoDsbKaqlKAnKv0AaEAE9EszYTayJAFjYLtqhToBsCgL7ujaTNiHpiMkofLFwCdDoAJzAARwBXOBwo7DA8ADdIdi4kED4BfxFxBGk5RRV1TW09QxNEVTtCFwkdCQVZdoUFJqlPbwxQ-0DyCmRyAENIxmYwOgBbMBwxiDHFrJE8wXDCyTZ6xpcbJRsbNysdG1UjUwQXFzZCFQkXHSlD1wkJJV6QEL9wwl+YXQUAoEAwYGI6DSqAA1hDATgAMJjUjkSIABTAYEiAFkxsgABZ4LBrHIbAo5IpKJROQifWTPNxuaxSFxXSTtQjWZonHTOTpOb4I-7UWjEqAAAiYwx4WMiAP6fwwsEWOGwBLGwLApN4-E2wkpiBp2kIOjNHRcSlkdik7IQUjYEkIdia+g0yienSFirCRFFEHFUumVBo9GlEPmi2Wq046z1FNAVIuNkaSm0zzUOiUrVttQQNNUpocaYcsk6DNc3t8voC-sD4ZDtCm5EIPEiqCg0VgsB1uXjW0N+ZssiUlnUrQUEkdDqUdpHzrN5t2UheLikHi8Px9gzbqFmPHwwIlcWokQlOFQEvxyDAB4lwowFGvt5wvfJA8TkhaheUahsCjYNcLnMO1VE+RRnikEdZFUF52i+TcHwCXd90PSUT2xc9L2fO8kNBbBSGJbVYzJfsDU-YobBXRoZHOOxoMdO0DhTGk7lUEcjjXWQdCrAZ-mFI8AHdBAJe8UTRChZWxQho3xDVfFIN8yPQbZ7XowgZDYGwPlaawYLtf8FEsJ5qTYHR3WzNdeKVAJohvdJ62DOzUgyZsITBEkSN1fIPzEI0tFHRcLStG07WceQnCea1qT5ZpVGsmtCGchyjwbZLXPDQhIyWFYxiUnzyL8oc9ktdM+Vg7MHAM+d13OB0FH-W5mgSwZ0sc4Z0pmTLd07OAey8vsCpUwcjnnXY2CtD4VxKBQ7SglNzKaaK0yW2QWpFUNA2ieJElBcFIWhOFCH9AAlWIEhVfL9WGijbBUB4wLYQCbDo7jc2uVx7mHBkum01pDnixDt3+QSxk2VLUDPLs+HQagKHDZIdpVZJYBh6groTIrjidRcWleWQnpg2c8yeFNXjXepJyeT4vSB6tBhwtCJW2i6cD2rADtheFgaIRmtvOxIEGJaFkBWcIsgx3yileKwNKnP7dLkS48ycHRFA+F6qPsRcbHWohQfByUGEh5m4DRygEZZxIUfNlglGybzrtU7HTUXaRh0J1RieuVQ3GdcsXAJ45jnaTxN3QVAIDgEQkLjIbVLoNk80TywnrT9O0-XDc+np-4SHIOOncHGm1fMM1SZkOQdFAy1GnsMuyyUJldbpviiAEqBC8xop9DV+l1Amj5bjLO1-q5D4Wk6KnNHsPXa021Lpi7qWjROFNrScJ7mU0X3R9g51AKeddfbLG059bdtUMDDCzwvK9kBvXCeZuwai9uu4jM+JQNHYk47i00CbR1a2DuP+VwrIJDnw7hKYSOBRKi1RNiZehVpZaELCuMsUgsFYI0NaUCssXhZjkNoZMDJz5tUXgXUi8cRr-nuLYL+1oAJuBkGFawXJKq+2qM8L2586xHitiqZBL8ihPHsHSUymhrS3CejYO0dVLDDk6C8KcZZPjnwNkzY2UMzbKjAMI52EhQLrn9m0XQE0TjtEBjnNuAQ+YCIFkI6hb8iraAZBpFwYFPG3AdBIZWPsTGOlsC8cmzQmhh3cEAA */
+  /** @xstate-layout N4IgpgJg5mDOIC5QGMD2A7dZkBcCWGAdHhADZgDEsY6EAtAGZ7kDaADALqKgAOqsefBm4gAHogBMAZgkAOQgFYAjAqlqJAFgWyFEgDQgAnoh1tFCgJxtZANiWy5G2RoC+Lg2kzYh6YmUqeWLgE6HQATmAAjgCucDjh2GB4AG6Q7FxIIHwCPiLiCNJyiipqMlo6+kaIAOwS1YQqcs42FhZSCtUWbh4YQT5+5BTI5ACGYYzMYHQAtmA4IxAj8+ki2YIheZJs1RqENjZSsjIWNtVsSmwaBsYI+2aN1Tq6bAod1d0ggd4hhF-B6FAKBAMGBiOhkqgANagv44ADCI1I5DCAAUwGAwgBZEbIAAWeCwK0ya1ymXySiU1QUhAk9lqr3OFkpNmuklk8gcUm27IsEgUGiUJw+sJ+1FoBKgAAImIMeOiwr9et8MLB5jhsLiRgCwETePx1sIyYhKVIlIRWq1tDZttoNJUblyJIQNGwbBodny2DI6lJhUrgkQxRAJdLJlQaPQZaDZvNFstOKt9aTQOT3bs7DJau7dBJLqyEJT6hZVNIlBJTho7Eo-V4A74gyGo+HaBNyIQeGFUFAIrBYLqskmNkaC04zds2HVVILZCd87IzQo2EulFz+UobLIa30fh3UNMePgAZLotQwpKcKhJTjkGAD5KRRgKNfbzh+yShynJLz6sp+abTeyboslUCC1AuLSvDsBzWu87ifP6-S7vuh5SieGLnpez53g+6BAtgpAEjqCbEoOhqfgUUiVoQ7RWCc7RUhoUj5taUiEFB1oUs01RUluyq+CKR4AO6CLi96IsiFByhihBxjimpeKQb6kegmwIJR1jUbmS6LtYRyyPmWjUhONhNI81R2JYCi8XWhARDeKSNmGdlJKkragsChLEXqOQfmIxrVKa5oWlaNrOPaiCWPIVJyBYjwWHaJk2NZ-TOQ5R5NqlrlRoQMYLEsIxKT5ZF+SOOx7CudSaNFubATco7UZZlbehu1TVnBOG2YkaVShlXVZZM7adt2cB9l5A5FSpw5KPV46TqaFgziZ+aHLsVhAZolFSMWQrtQhooRiGEQxHEQIgmCELQoQQYAEpRLEqqFQak3kZoKgNK1Fnzm67rVPmsWsSc-K0q0K4CslPyCSM6zpagZ49nw6DUBQUYJMdqoJLACPUI9yYlRodpBRapSyGwVhMSB5a7JRNgdBUFKvMW4NEJD0M9bDkrwyqlAo0d93xJziM6koGTeU9qn406FqtMTpNevm5nUlo1pLjaXIrkzvhYShHN3SdHmggSF0wntRBa4duuqgghuoMgSwhOkOO+fk6nyDIKs6eyhzy5YigSOW64HHyvJdB86CoBAcAiDhiYTapdC1YgdDUlLKdS1ISW7bW-QkOQMdi8OtI+0cxY6On2ixQnoF2HsrpLlIAWHIusE9FnPwCVAee4-k3EWDSdIyOuhx1Eo+Z8rsnIUmPTKyGcriZ9ugYHelkyd07xqVuP2bmfYuamqPnTOq6+PxSTDESBrg17geIZoWeF5XsgN7YSbz3jfnL3WtStIvPsjyB1S3t5A5lOG6BabUW4L34ntISIkxJIgxKvYqzsAr1C2g4OQtIUG-RAmceQbQ2jTVNK1C0F9MqOVziRWOU0tBmE0IXJcpwZ7FnzNoJ0846hulUJFL0F8GxHl5nERBr98jlheH3H+jD-4KD+goGwvtVBOA0AtWRGcIF8UICzbWDB2YC2oEI8W4VQLtGdAzAKtg3RbV9PPdRZt+EWxwPo4cAE5HpxaKaSw3FXTkxuAFIyfsaaUjkFOKybgXBAA */
   id: "connection",
 
   initial: "idle",
@@ -190,8 +190,6 @@ export const connectionMachine = setup({
             { type: "setFileToContext", params: ({ event }) => event.file },
             "clearFileMetadataFromContext",
           ],
-
-          reenter: true,
         },
 
         "connection-request-received": {
@@ -228,7 +226,6 @@ export const connectionMachine = setup({
 
         onDone: {
           target: "sending file",
-          reenter: true,
         },
       },
     },
@@ -275,14 +272,16 @@ export const connectionMachine = setup({
         accept: {
           target: "accepting request",
           actions: ["createPeerConnection", "clearFileMetadataFromContext"],
-          reenter: true,
         },
         decline: {
           target: "idle",
-          actions: {
-            type: "sendResponse",
-            params: false,
-          },
+          actions: [
+            {
+              type: "sendResponse",
+              params: false,
+            },
+            "clearFileMetadataFromContext",
+          ],
         },
       },
     },
@@ -328,7 +327,6 @@ export const connectionMachine = setup({
       on: {
         "receive-file.done": {
           target: "idle",
-          reenter: true,
           actions: "closePeerConnection",
         },
 
@@ -385,7 +383,6 @@ export const connectionMachine = setup({
           },
           {
             target: "idle",
-            reenter: true,
           },
         ],
       },
