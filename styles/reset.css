@@ -1,0 +1,9 @@
+div,
+body,
+main {
+  @apply flex flex-col;
+}
+
+* {
+  @apply min-w-0 shrink-0;
+}

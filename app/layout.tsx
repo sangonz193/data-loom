@@ -1,5 +1,11 @@
+import "../styles/globals.css"
+import "../styles/reset.css"
+
 import { GeistSans } from "geist/font/sans"
-import "./globals.css"
+import { PropsWithChildren } from "react"
+
+import { cn } from "@/lib/cn"
+import { themeClassNames } from "@/styles/themeClasses"
 
 const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
@@ -11,17 +17,13 @@ export const metadata = {
   description: "The fastest way to build apps with Next.js and Supabase",
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: PropsWithChildren) {
   return (
     <html lang="en" className={GeistSans.className}>
-      <body className="bg-background text-foreground">
-        <main className="flex min-h-screen flex-col items-center">
-          {children}
-        </main>
+      <body
+        className={cn("bg-background text-foreground", themeClassNames.default)}
+      >
+        <main className="min-h-screen bg-background">{children}</main>
       </body>
     </html>
   )
