@@ -38,7 +38,7 @@ export async function createPairingCode() {
 }
 
 function getRandomCode() {
-  return Math.random().toString(36).substring(2, 4)
+  return Math.random().toString().substring(2, 6)
 }
 
 export async function redeemPairingCode(code: string) {

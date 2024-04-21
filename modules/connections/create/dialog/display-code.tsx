@@ -26,7 +26,7 @@ export function DisplayCode({ code }: Props) {
     <>
       <span>Your connection code is:</span>
       <div className="mx-auto flex-row items-center gap-3">
-        <span className="text-center text-2xl">{code}</span>
+        <span className="text-center font-mono text-2xl">{code}</span>
 
         <Button
           size="icon"
