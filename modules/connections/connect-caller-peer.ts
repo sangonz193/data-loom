@@ -143,7 +143,7 @@ export const connectCallerPeerMachine = setup({
     hasAnswer: ({ context }) => context.answer !== undefined,
   },
 }).createMachine({
-  /** @xstate-layout N4IgpgJg5mDOIC5QGMD2A7dZkBcC0ADmGAE6x7ICGANtaQMSwCWU6NsAdE8mBZehCYRKOMAG0ADAF1EoAqmY4mGWSAAeiAOwBWAJwdNAFgBMpgBwA2CQGZtmzWYA0IAJ6IAjBLMdD26xMMAw2DjbXdNAF8I5zRMbHwiUnIqWgZmVnYOflgAd1JJGSQQeUVldFUNBAdrDm0LC2DDXQkws1tnNwQLXW8zd2NrawH-L11dKJiMLFxCYjI+VJJ6RJIKKfiyjgg4ZBImAiUMAtUSpkPyosrNa0MOL2MJTXrA92t6jo9jCZBY6YS55I0OhLFZrOK4TawACuyB4sFgADModRjkVTucKlpNB8ENZNMYfCYjDdjPZHmZtN9fvFZkkFsDlnMwX9NtxeFQBEIROJpCcFGcypiqsZbm0xgELDpbDocVYCbZdMZdO4zBTnmYqesZitAYsODlKAL0FAAAQI1AkE3ZPJLVFyfkYy6fV4cSXGdyGazudy6QwepyuRCGSWuxUWax9TTKwZmQya8H-OkpYEcZB0fhMY0mqEEE0EEhgABuyihsCtOFEAFsDrB6BAMGAuOhC6gANaNtNgfgAVQIAGUWGxqJmoAAlVA5WB24oOwVOhCGewcMYrvw3CzaULYwML+rLkwb3ThyVmZXxv60+bJ0gcWBgCsjk0FyuoURW9C5Big6kQjBcHh8JywiiNO6JzqAlSvCGviaCq9gWP0ATaDiNyaD4EgIboRimH4koWOeNI6vSN67F2ShZqgCIIgwoGzio86qhYBh2LGPRWDYxgWDijQGO4Vj2GE7jaDYkpRNEIDoKg2zwEUP6JleQKkHypT0RBiBKjiKpMc0mESAMzQOOM4lyZeuopgaRqmualrWkpaJ0RcakIJ4oQcNYPTaJ6uibrYAadMG2j7pxi5mE8HnWAR2oAsRJBbA2ykCqp6hBkuK5jGuAVbihhjeD6pKBFKsZNJF8lmSR6boI+OZ5gWxaoKW5ZVjWCWOk59jcUMQX1KEbyhZx+HGVqpUxbe97kaaz6vmA76fiQLXgclzlvASAzBg8sYWGY9zcTlHAUroqHurBzRxoNCamSNpEiI+lHUXN9kqY5i3XLc-rBMJEijEM3Ebl1IVhRSEViUAA */
+  /** @xstate-layout N4IgpgJg5mDOIC5QGMD2A7dZkBcC0ADmGAE6x7ICGANtaQMSwCWU6NsAdE8mBZehCYRKOMAG0ADAF1EoAqmY4mGWSAAeiAOwBWAJwdNAFgBMAZgmHNugGzXTpgIwAaEAE9EDiQA4Oh7Y4ldT21NUOMAX3CXNExsfCJScipaBmZWdg5+WAB3UkkZJBB5RWV0VQ0ETWtDDm1Da10vbWttL0ttbRd3BAafLwdjPwk64y9Qh0jojCxcQmIyPhSSegSSCmm40o4IOGQSJgIlDHzVYqYjssKKzVMa72MHawlNY11dQ1MujwiokBiZ+LzJI0OjLVbrWK4LawACuyB4sFgADMYdQToUzhdylpNF8EKYXr4TNYHhJHIZDLpJn8NrNVsClit5hCAVtuLwqAIhCJxNJTgpzqVsZVBhwvKY3iEmm8dMY8U9jBxTHpbg4PppAo1qf84nNEotQRxspRBegoAACJGoEjmrK5ZbouQCrFXb4OUwcayaBw2Ko6OpGPH1TSe3TGEm6CV+NXabW0wH65KG5B0fhMM3mmEEc0EEhgABuyhhsFtOFEAFtDrB6BAMGAuOh86gANb1lNgfgAVQIAGUWGxqOmoAAlVDZWCOorOoWuhCWHwSRdkjpeWzVHRB2wcd7h0ZPD6rqm-HV0oEG0gcWBgMtD8158uoUS29A5Bjgk8XLg8Phc4SiSeYjOoAVO6Xq+CEDghI02iDKueK3CGhgSCS-j+O6jwTMe8Z6gsSYXnsHZKBmqBIkiDAAdOKizl4q4GFKLRqqM2hqkGFIGI83gDB0i71JEvzoKgOzwIUH44QyoL8iUVHAYgrx4g4tG6MhDxeA8kF1IYcaQgmuEghexqmhaVo2napCSYK0nqB4EjGNoSqNIYXjPI4xg6Lom52TuJIaoM6GaFpAJieeJDbHW5kujJc6aAuS7Kq0a7tPBjkcD64amC0zRht6mlYdpQV4SF7ZphmWY5nmhaoMWpYVlW4VAVZlS4m4iAfIqXn2E0qnIelAW6vSwWXteREWvej5gM+r4kHVlkgelipmH4tkWDY7qdM1c7JdKrnvAS3rNNYvWnomemFXmIi3iRZFTRilGXJFNw1GqbSNHYNzOR527Eq5NmGH5fHhEAA */
   id: "connect-peers-caller",
 
   context: ({ input }) => ({
@@ -200,7 +200,6 @@ export const connectCallerPeerMachine = setup({
 
       on: {
         "peer-connection.ice-candidate": {
-          target: "setting remote answer",
           actions: {
             type: "sendIceCandidate",
             params: ({ event }) => event.candidate,
@@ -240,14 +239,17 @@ export const connectCallerPeerMachine = setup({
     },
 
     "signals.answer": {
-      actions: sendTo(
-        "connectPeer",
-        ({ event }) =>
-          ({
-            type: "description-received",
-            description: event.answer,
-          }) satisfies ConnectPeerInputEvent,
-      ),
+      actions: [
+        { type: "saveAnswerToContext", params: ({ event }) => event.answer },
+        sendTo(
+          "connectPeer",
+          ({ event }) =>
+            ({
+              type: "description-received",
+              description: event.answer,
+            }) satisfies ConnectPeerInputEvent,
+        ),
+      ],
     },
 
     "peer-connection.description": {
