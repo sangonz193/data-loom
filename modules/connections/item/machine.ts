@@ -50,6 +50,10 @@ export const connectionMachine = setup({
     input: {} as Input,
     children: {} as {
       peerConnectionEvents: "peerConnectionEvents"
+      connectCallerPeerMachine: "connectCallerPeerMachine"
+      connectReceiverPeerMachine: "connectReceiverPeerMachine"
+      sendFile: "sendFile"
+      receiveFile: "receiveFile"
     },
   },
   actions: {
@@ -122,6 +126,7 @@ export const connectionMachine = setup({
     connecting: {
       invoke: {
         src: "connectCallerPeerMachine",
+        id: "connectCallerPeerMachine",
 
         input: ({ context }) => ({
           ...context,
@@ -138,6 +143,7 @@ export const connectionMachine = setup({
     "sending file": {
       invoke: {
         src: "sendFile",
+        id: "sendFile",
 
         input: ({ context }) => ({
           ...context,
@@ -170,6 +176,7 @@ export const connectionMachine = setup({
     "connecting with caller": {
       invoke: {
         src: "connectReceiverPeerMachine",
+        id: "connectReceiverPeerMachine",
 
         input: ({ context }) => ({
           ...context,
@@ -197,6 +204,7 @@ export const connectionMachine = setup({
     "receiving file": {
       invoke: {
         src: "receiveFile",
+        id: "receiveFile",
 
         input: ({ context }) => ({
           dataChannel: context.dataChannel!,

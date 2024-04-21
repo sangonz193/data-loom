@@ -73,63 +73,75 @@ export function Connection({ connection }: Props) {
   return (
     <div
       className={cn(
-        "flex-row gap-3 rounded-md border bg-card p-4",
+        "rounded-md border border-primary/50 bg-card p-4",
         themeClassNames[
           (remoteUser?.color_id as keyof typeof themeClassNames) || "default"
         ],
       )}
     >
-      <Avatar
-        animalEmoji={remoteUser?.animals?.emoji}
-        animalLabel={remoteUser?.animals?.label}
-        colorLabel={remoteUser?.colors?.label}
-      />
+      <div className="flex-row gap-3">
+        <Avatar
+          animalEmoji={remoteUser?.animals?.emoji}
+          animalLabel={remoteUser?.animals?.label}
+          colorLabel={remoteUser?.colors?.label}
+        />
 
-      <div className="grow" />
+        <div className="grow">
+          <h2 className="font-bold">
+            {getUserName({
+              colorLabel: remoteUser?.colors?.label,
+              animalLabel: remoteUser?.animals?.label,
+            })}
+          </h2>
+        </div>
 
-      <input
-        ref={inputRef}
-        type="file"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0]
-          if (file) {
-            send({ type: "send-file", file })
-          }
-        }}
-      />
-      {state.can({ type: "send-file" }) && (
-        <Button variant="ghost" onClick={() => inputRef.current?.click()}>
-          Send file
-        </Button>
-      )}
+        <input
+          ref={inputRef}
+          type="file"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) {
+              send({ type: "send-file", file })
+            }
+          }}
+        />
 
-      <DeleteConnection connection={connection} />
+        {state.value === "prompting user to accept connection" && (
+          <AlertDialog open>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Accept the file?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {getUserName({
+                    colorLabel: remoteUser?.colors?.label,
+                    animalLabel: remoteUser?.animals?.label,
+                  })}{" "}
+                  wants to send you a file. Do you want to accept it?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => send({ type: "decline" })}>
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction onClick={() => send({ type: "accept" })}>
+                  Accept
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+      </div>
 
-      {state.value === "prompting user to accept connection" && (
-        <AlertDialog open>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Accept the file?</AlertDialogTitle>
-              <AlertDialogDescription>
-                {getUserName({
-                  colorLabel: remoteUser?.colors?.label,
-                  animalLabel: remoteUser?.animals?.label,
-                })}{" "}
-                wants to send you a file. Do you want to accept it?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => send({ type: "decline" })}>
-                Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction onClick={() => send({ type: "accept" })}>
-                Accept
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+      <div className="flex-row-reverse gap-3">
+        <DeleteConnection connection={connection} />
+
+        {state.can({ type: "send-file" }) && (
+          <Button variant="ghost" onClick={() => inputRef.current?.click()}>
+            Send file
+          </Button>
+        )}
+      </div>
     </div>
   )
 }

@@ -22,6 +22,12 @@ export function Connections() {
           connection={connection}
         />
       ))}
+
+      {!isLoading && !data?.length && (
+        <div className="text-center text-muted-foreground">
+          No connections yet
+        </div>
+      )}
     </div>
   )
 }

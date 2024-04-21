@@ -12,7 +12,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { Tables } from "@/supabase/types"
+import { Tables, TablesInsert } from "@/supabase/types"
 import { createClient } from "@/utils/supabase/client"
 
 type Props = {
@@ -43,7 +43,13 @@ export function DeleteConnection({ connection }: Props) {
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={async () => {
-              await supabase.from("user_connections").delete().match(connection)
+              await supabase
+                .from("user_connections")
+                .delete()
+                .match({
+                  user_1_id: connection.user_1_id,
+                  user_2_id: connection.user_2_id,
+                } satisfies TablesInsert<"user_connections">)
             }}
           >
             Delete
