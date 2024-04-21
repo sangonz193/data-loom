@@ -73,7 +73,16 @@ export const connectionMachine = setup({
   },
   actions: {
     createPeerConnection: enqueueActions(({ enqueue }) => {
-      const peerConnection = new RTCPeerConnection()
+      const peerConnection = new RTCPeerConnection({
+        iceServers: [
+          {
+            urls: [
+              "stun:stun1.l.google.com:19302",
+              "stun:stun3.l.google.com:19302",
+            ],
+          },
+        ],
+      })
       enqueue.assign({ peerConnection })
 
       enqueue.spawnChild("peerConnectionEvents", {

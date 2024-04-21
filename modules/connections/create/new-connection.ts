@@ -54,7 +54,17 @@ export const newConnectionMachine = setup({
       redeemCode: (_, redeemCode: string) => redeemCode,
     }),
     createPeer: assign({
-      peerConnection: () => new RTCPeerConnection(),
+      peerConnection: () =>
+        new RTCPeerConnection({
+          iceServers: [
+            {
+              urls: [
+                "stun:stun1.l.google.com:19302",
+                "stun:stun3.l.google.com:19302",
+              ],
+            },
+          ],
+        }),
     }),
     saveRemoteUserIdToContext: assign({
       remoteUserId: (_, remoteUserId: string) => remoteUserId,
@@ -197,10 +207,9 @@ export const newConnectionMachine = setup({
         id: "connectCallerPeerMachine",
 
         input: ({ context }) => ({
-          currentUser: context.currentUser,
-          peerConnection: new RTCPeerConnection(),
+          ...context,
+          peerConnection: context.peerConnection!,
           remoteUserId: context.remoteUserId!,
-          supabase: context.supabase,
         }),
 
         onDone: {
@@ -241,10 +250,9 @@ export const newConnectionMachine = setup({
         src: "connectReceiverPeerMachine",
         onDone: "connected",
         input: ({ context }) => ({
-          currentUser: context.currentUser,
-          peerConnection: new RTCPeerConnection(),
+          ...context,
+          peerConnection: context.peerConnection!,
           remoteUserId: context.remoteUserId!,
-          supabase: context.supabase,
         }),
       },
     },
