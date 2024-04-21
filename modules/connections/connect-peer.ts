@@ -80,6 +80,7 @@ const invoke: InvokeCallback<
         logger.info("[connect-peer] Remote description set")
 
         pendingIceCandidates.map((candidate) => {
+          logger.info("[connect-peer] Adding pending ice candidate", candidate)
           peerConnection.addIceCandidate(candidate)
         })
 
@@ -99,7 +100,7 @@ const invoke: InvokeCallback<
         logger.info("[connect-peer] Received ice candidate", event.candidate)
         if (peerConnection.remoteDescription) {
           peerConnection.addIceCandidate(event.candidate)
-          logger.info("[connect-peer] Added Ice candidate", event.candidate)
+          logger.info("[connect-peer] ice candidate added", event.candidate)
         } else {
           pendingIceCandidates.push(event.candidate)
           logger.info(

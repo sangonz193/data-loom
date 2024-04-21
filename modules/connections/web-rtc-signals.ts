@@ -34,9 +34,13 @@ export const webRtcSignals = fromCallback<{ type: "noop" }, Input>((params) => {
 
   function handleRow(newRow: Tables<"web_rtc_signals">) {
     if (newRow.to_user_id !== currentUser.id) {
-      logger.info(
-        `[webRtcSignals] Ignoring signal for another user ${newRow.to_user_id}`,
-      )
+      if (newRow.from_user_id === currentUser.id) {
+        // This is a signal that we sent, ignore it
+      } else {
+        logger.info(
+          `[webRtcSignals] Ignoring signal for another user ${newRow.to_user_id}`,
+        )
+      }
       return
     }
 

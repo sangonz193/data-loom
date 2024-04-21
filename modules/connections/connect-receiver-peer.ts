@@ -31,6 +31,11 @@ export const connectReceiverPeerMachine = setup({
     input: {} as Input,
     context: {} as Context,
     events: {} as Event,
+    children: {} as {
+      cleanUpSignalingRows: "cleanUpSignalingRows"
+      webRtcSignals: "webRtcSignals"
+      connectPeer: "connectPeer"
+    },
   },
   actions: {
     setAnswerToContext: assign({
@@ -81,7 +86,7 @@ export const connectReceiverPeerMachine = setup({
   },
   actors: {
     cleanUpSignalingRows: cleanUpSignalingRowsActor,
-    listenForSignals: webRtcSignals,
+    webRtcSignals,
     connectPeer,
   },
   guards: {
@@ -106,7 +111,8 @@ export const connectReceiverPeerMachine = setup({
       }),
     },
     {
-      src: "listenForSignals",
+      src: "webRtcSignals",
+      id: "webRtcSignals",
       input: ({ context }) => context,
     },
   ],
@@ -136,6 +142,7 @@ export const connectReceiverPeerMachine = setup({
     "cleaning up previous attempts": {
       invoke: {
         src: "cleanUpSignalingRows",
+        id: "cleanUpSignalingRows",
         onDone: "creating answer",
         input: ({ context }) => context,
       },

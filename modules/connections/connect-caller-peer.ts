@@ -33,6 +33,11 @@ export const connectCallerPeerMachine = setup({
     input: {} as Input,
     context: {} as Context,
     events: {} as Event,
+    children: {} as {
+      cleanUpSignalingRows: "cleanUpSignalingRows"
+      webRtcSignals: "webRtcSignals"
+      connectPeer: "connectPeer"
+    },
   },
   actions: {
     removeDataChannel: assign({
@@ -89,18 +94,56 @@ export const connectCallerPeerMachine = setup({
           else logger.info("[connectCallerPeerMachine] ice candidate sent")
         })
     },
+    savePendingIceCandidate: assign({
+      pendingIceCandidates: (
+        { context: { pendingIceCandidates } },
+        candidate: RTCIceCandidate,
+      ) => [...pendingIceCandidates, candidate],
+    }),
+    sendPendingIceCandidates: assign({
+      pendingIceCandidates: ({
+        context: { pendingIceCandidates, supabase, remoteUserId, currentUser },
+      }) => {
+        logger.info(
+          "[connectCallerPeerMachine] sending pending ice candidates",
+          pendingIceCandidates.length,
+        )
+        supabase
+          .from("web_rtc_signals")
+          .insert(
+            pendingIceCandidates.map((candidate) => ({
+              from_user_id: currentUser.id,
+              to_user_id: remoteUserId,
+              payload: candidate as unknown as Json,
+            })),
+          )
+          .then(({ error }) => {
+            if (error)
+              logger.error(
+                "[connectCallerPeerMachine] sendPendingIceCandidates error",
+                error,
+              )
+            else
+              logger.info(
+                "[connectCallerPeerMachine] pending ice candidates sent",
+              )
+          })
+
+        return []
+      },
+    }),
   },
   actors: {
     cleanUpSignalingRows: cleanUpSignalingRowsActor,
-    listenForSignals: webRtcSignals,
     connectPeer,
+    webRtcSignals,
   },
   guards: {
     hasOffer: ({ context }) => context.offer !== undefined,
     hasAnswer: ({ context }) => context.answer !== undefined,
   },
 }).createMachine({
-  /** @xstate-layout N4IgpgJg5mDOIC5QGMD2A7dZkBcC0ADmGAE6x7ICGANtaQMSwCWU6NsAdE8mBZehCYRKOMAG0ADAF1EoAqmY4mGWSAAeiAGwAOAIwcATAc2aALAGZdR7cfMAaEAE9EBiaY4BOCZt0nf20wDzTQBfEIc0TGx8IlJyKloGZlZ2Dn5YAHdSSRkkEHlFZXRVDQQdDw4rbQ9TU11TAFYAj00HZwQrMIiMLFxCYjI+RJJ6WJIKHuiijgg4ZBImAiUMHNUCpmXivNLNJo4TUwkPAHZdY7dzjzbEXQltDkbzCXNjk81zBvqukEjemIH4jQ6CMxhMorhprAAK7IHiwWAAMyh1FWeXWmxKiGOx2uCAapgqHw85gs5m0Ega5g82m+v2i-TiQ2BowGYL+024vCoAiEInE0jWCg2RUxZQJDwMug8ul0wQkBlMBnsTixNQ4DU0BgaBi8xwaLVltMmfTGgOGHAylGF6CgAAIEagSLb0lkRqi5EKMdsbvUJOqlQTgkqFeYDLjTJoKrdidHtNUPNSjeD-oyEsCOMg6PwmDbbVCCLaCCQwAA3ZRQ2DOnCiAC2S1g9AgGDAXHQJdQAGsW3STQCmaQM1n0Dm7fnC8Wy6gK1Xa-WEDn21RNjl3flPSLvQgyX6JLoNQY9buTnvwzoOETLKctVrjhGk38GYM0wP5mARCPbagEQiGKv0RvQFKPRzH2I5DjuWVyl0cMI0qUNjjMPRtQPJUwnCEB0FQWZ4DyHsUyfIFSEFQoVE3HVcQMbQQKJa9Xk0O4DHvelTX7EgLStJRcwdJ0XSItF11IwDEA8bVDAaCRdwkY4nn1MMVQQCNjnPWSE1DJpGmxJje1TQi2KbLBiOFQT1EQMkGg4Xd90PKVTgaXFtU0ZTiQ+M43HMYItPws100zN9h1zMci1LctKxEWccBwj0SK2ISEGxGCQO0FSZT3aSRIaTzH28gdYDAasP2LGtUFEZ10EyPioqMmKTI6SiKjueiXI8Ixgjs+TakS5KZQaNKGgy9C8Ky1iM2Ld9cy-H8SEMr1Yr8CyJPlbxpKpDVTyUmjVK1AIeuONCQiAA */
+  /** @xstate-layout N4IgpgJg5mDOIC5QGMD2A7dZkBcC0ADmGAE6x7ICGANtaQMSwCWU6NsAdE8mBZehCYRKOMAG0ADAF1EoAqmY4mGWSAAeiAOwBWAJwdNAFgBMpgBwA2CQGZtmzWYA0IAJ6IAjBLMdD26xMMAw2DjbXdNAF8I5zRMbHwiUnIqWgZmVnYOflgAd1JJGSQQeUVldFUNBAdrDm0LC2DDXQkws1tnNwQLXW8zd2NrawH-L11dKJiMLFxCYjI+VJJ6RJIKKfiyjgg4ZBImAiUMAtUSpkPyosrNa0MOL2MJTXrA92t6jo9jCZBY6YS55I0OhLFZrOK4TawACuyB4sFgADModRjkVTucKlpNB8ENZNMYfCYjDdjPZHmZtN9fvFZkkFsDlnMwX9NtxeFQBEIROJpCcFGcypiqsZbm0xgELDpbDocVYCbZdMZdO4zBTnmYqesZitAYsODlKAL0FAAAQI1AkE3ZPJLVFyfkYy6fV4cSXGdyGazudy6QwepyuRCGSWuxUWax9TTKwZmQya8H-OkpYEcZB0fhMY0mqEEE0EEhgABuyihsCtOFEAFsDrB6BAMGAuOhC6gANaNtNgfgAVQIAGUWGxqJmoAAlVA5WB24oOwVOhCGewcMYrvw3CzaULYwML+rLkwb3ThyVmZXxv60+bJ0gcWBgCsjk0FyuoURW9C5Big6kQjBcHh8JywiiNO6JzqAlSvCGviaCq9gWP0ATaDiNyaD4EgIboRimH4koWOeNI6vSN67F2ShZqgCIIgwoGzio86qhYBh2LGPRWDYxgWDijQGO4Vj2GE7jaDYkpRNEIDoKg2zwEUP6JleQKkHypT0RBiBKjiKpMc0mESAMzQOOM4lyZeuopgaRqmualrWkpaJ0RcakIJ4oQcNYPTaJ6uibrYAadMG2j7pxi5mE8HnWAR2oAsRJBbA2ykCqp6hBkuK5jGuAVbihhjeD6pKBFKsZNJF8lmSR6boI+OZ5gWxaoKW5ZVjWCWOk59jcUMQX1KEbyhZx+HGVqpUxbe97kaaz6vmA76fiQLXgclzlvASAzBg8sYWGY9zcTlHAUroqHurBzRxoNCamSNpEiI+lHUXN9kqY5i3XLc-rBMJEijEM3Ebl1IVhRSEViUAA */
   id: "connect-peers-caller",
 
   context: ({ input }) => ({
@@ -118,7 +161,8 @@ export const connectCallerPeerMachine = setup({
       }),
     },
     {
-      src: "listenForSignals",
+      src: "webRtcSignals",
+      id: "webRtcSignals",
       input: ({ context }) => context,
     },
   ],
@@ -139,16 +183,30 @@ export const connectCallerPeerMachine = setup({
     "cleaning up previous attempts": {
       invoke: {
         src: "cleanUpSignalingRows",
+        id: "cleanUpSignalingRows",
         input: ({ context }) => context,
         onDone: "creating offer",
       },
     },
 
     "setting remote answer": {
-      entry: sendTo("someActor", ({ context }) => ({
-        type: "someEvent",
-        data: context.answer!,
-      })),
+      entry: [
+        sendTo("someActor", ({ context }) => ({
+          type: "someEvent",
+          data: context.answer!,
+        })),
+        "sendPendingIceCandidates",
+      ],
+
+      on: {
+        "peer-connection.ice-candidate": {
+          target: "setting remote answer",
+          actions: {
+            type: "sendIceCandidate",
+            params: ({ event }) => event.candidate,
+          },
+        },
+      },
     },
 
     "creating offer": {
@@ -203,7 +261,7 @@ export const connectCallerPeerMachine = setup({
 
     "peer-connection.ice-candidate": {
       actions: {
-        type: "sendIceCandidate",
+        type: "savePendingIceCandidate",
         params: ({ event }) => event.candidate,
       },
     },

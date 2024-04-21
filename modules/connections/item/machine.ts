@@ -68,10 +68,7 @@ export const connectionMachine = setup({
       fileToSend: (_, file: File) => file,
     }),
     setDataChannelToContext: assign({
-      dataChannel: (_, channel: RTCDataChannel) => {
-        console.log("*** channel", channel.label)
-        return channel
-      },
+      dataChannel: (_, channel: RTCDataChannel) => channel,
     }),
     closePeerConnection: enqueueActions(({ enqueue, context }) => {
       enqueue.stopChild("peerConnectionEvents")
@@ -90,9 +87,8 @@ export const connectionMachine = setup({
     receiveFile,
   },
   guards: {
-    isFileDataChannel: (_, dataChannel: RTCDataChannel) => {
-      return dataChannel.label === "file"
-    },
+    isFileDataChannel: (_, dataChannel: RTCDataChannel) =>
+      dataChannel.label === "file",
   },
 }).createMachine({
   /** @xstate-layout N4IgpgJg5mDOIC5QGMD2A7dZkBcCWGAdHhADZgDEsY6EAtAGZ7kDaADALqKgAOqsefBm4gAHogCMANjaEALAE4lCgMxsAHACY2AVgVSVAGhABPRDoOEJAdgXWNU6yrlS5mgL7vjaTNiHpiMkofLFwCdDoAJzAARwBXOBwo7DA8ADdIdi4kED4BfxFxBGlZRWU1LV19I1NETWsdQmtNKR0dFR0JdTlO-U9vDFD-QhC-PHQoCggMMGJ0NNQAa1nRsKJV-AmEcYXkAEN-LKyRPMFwwsQGhXllbs7rOXVu4zMEGQkrFU0FXUf1NhUTn6IA24UI1Fo4ygAAImOQKDwwGBIiNBmMMLAcAdsAALPYTMDHHKnAo5IpXG5KO42P5yF6IORueTfRxsFzqOwSHTA0FEHiRVAAWx4mxhcWokWhOFQ0L2yGQYBF0N56AocoVIqJvH4Z2EZMuekpCmpDyedNqCHqsgkci+jykmi+3wkPLRawC-KFIqh0PFyKlMvVipwyrd-im2FI40JnBOOtJoCKXw+Kg6xsenTY+npls0jU0LRkbAdWh+QK8ILDYNBE2hAHdBDjlXtSORIgikSiIAc5XjfKQtbl4+d9cU5BJNFYsyplGw2Zpza8rVZbQv1A6nQoXRWVYRogr0j64ZR96kMoxmLNplhBySR4nJIzZEpHXPWnmAdYc+oPjo52xXz-aw7gUTwK3QVAIDgEQVTjfJ7zERA6CkHM6EaZQFHHDQ5AaCRMKkV1fHdQJyDg3V0AuBA3BzHRuiaJQcMdR0fxUbcBiI4YaygMiE0QqicMIL4AQA9QdDkNgJBpGjrCkQgDE0J42CcPQt1AncqyICEICPS8eIQooJCzawrFcSSlNopwJBqV4LBUQhNGkBzgPsJ4nkIoYwU9YVRV9CUA1leVg1DDiELvPUHyowErAUdptDUBpbS-C1vjsqQ8OcpQHTcCx3PRAIuPrRtm1bZE9PCvjDLsEzx0Mhp1Es6y6nsKw8P+Rw82aCS5Fy4jT0PWtjzKijR2kRlCB+Ax2htGkdBzPNZPsVjbXXYsbG3TwgA */
