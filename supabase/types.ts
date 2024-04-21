@@ -2,8 +2,47 @@ import { MergeDeep } from "type-fest"
 
 import * as Generated from "./types.gen"
 
-// eslint-disable-next-line @typescript-eslint/ban-types
-export type Database = MergeDeep<Generated.Database, {}>
+export type AnimalId =
+  | "bear"
+  | "bee"
+  | "bird"
+  | "cat"
+  | "dog"
+  | "fish"
+  | "rabbit"
+  | "rat"
+  | "snail"
+  | "squirrel"
+  | "turtle"
+
+export type ColorId =
+  | "red"
+  | "rose"
+  | "orange"
+  | "green"
+  | "blue"
+  | "yellow"
+  | "violet"
+
+export type Database = MergeDeep<
+  Generated.Database,
+  {
+    public: {
+      tables: {
+        animals: {
+          Row: {
+            id: AnimalId
+          }
+        }
+        colors: {
+          Row: {
+            id: ColorId
+          }
+        }
+      }
+    }
+  }
+>
 
 export type Json = Generated.Json
 

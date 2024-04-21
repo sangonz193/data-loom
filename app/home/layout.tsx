@@ -2,6 +2,7 @@ import { PropsWithChildren } from "react"
 
 import { Header } from "@/components/header"
 import { RequiredAuthClient } from "@/modules/auth/required"
+import { IncomingConnectionsProvider } from "@/modules/connections/incoming-connections"
 
 import { assertUser } from "../utils/user-session"
 
@@ -10,8 +11,10 @@ export default async function Layout({ children }: PropsWithChildren) {
 
   return (
     <RequiredAuthClient user={user}>
-      <Header />
-      {children}
+      <IncomingConnectionsProvider>
+        <Header user={user} />
+        {children}
+      </IncomingConnectionsProvider>
     </RequiredAuthClient>
   )
 }
