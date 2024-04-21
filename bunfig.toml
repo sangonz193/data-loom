@@ -1,0 +1,2 @@
+[install.lockfile]
+print = "yarn" # Needed for patch-package and to easily review changes in dependencies.
