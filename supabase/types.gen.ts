@@ -34,6 +34,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      animals: {
+        Row: {
+          emoji: string
+          id: string
+          label: string
+        }
+        Insert: {
+          emoji: string
+          id: string
+          label: string
+        }
+        Update: {
+          emoji?: string
+          id?: string
+          label?: string
+        }
+        Relationships: []
+      }
+      colors: {
+        Row: {
+          id: string
+          label: string
+        }
+        Insert: {
+          id: string
+          label: string
+        }
+        Update: {
+          id?: string
+          label?: string
+        }
+        Relationships: []
+      }
       pairing_code_redemptions: {
         Row: {
           created_at: string
@@ -128,18 +161,39 @@ export type Database = {
       }
       users: {
         Row: {
+          animal_id: string | null
+          color_id: string | null
           created_at: string | null
           id: string
         }
         Insert: {
+          animal_id?: string | null
+          color_id?: string | null
           created_at?: string | null
           id: string
         }
         Update: {
+          animal_id?: string | null
+          color_id?: string | null
           created_at?: string | null
           id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "users_animal_id_fkey"
+            columns: ["animal_id"]
+            isOneToOne: false
+            referencedRelation: "animals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "users_color_id_fkey"
+            columns: ["color_id"]
+            isOneToOne: false
+            referencedRelation: "colors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       web_rtc_signals: {
         Row: {
