@@ -142,7 +142,7 @@ export const newConnectionMachine = setup({
     }),
   },
 }).createMachine({
-  /** @xstate-layout N4IgpgJg5mDOIC5QDswHcC0BjA9s1WALgJZ4B0xEANmAMRYBOYAhoWNjhGANoAMAuolAAHHLGIk8QkAA9EARgBMAVjLLeG+esUAWAOwAOZQDYdAGhABPRIoCcqlRt57jtg-L2KAzDoC+vi1RMXHwwIlJkCmo6Ji4wAFsOLj5BJBBRcUlkaTkEJVV1TW19I1MLazzFAzVvHR15Yy95XgaDf0D0DlDw8kYWEmQoAAJcLloIPDAKZAA3HABrKaCugiyyPtZiQZHOMAQtuaxNvBSU6QyJCJzEEx0yYz15W3kvRV4vPUMvcps9LzJPj4dI0vI1jO52iBliFVhEyFRiLA2MgtsMAGY4BhDWIJYRZWC0HHxPERDBMLBgYgzSBnNIXLLXPK8VxkZq2HS6XTGeTyAwGH4IFTVPS2cHc2yggy8Aw6ZSQ6F4WG9RVhAbDI5UGgMcaTaZzRbrFVEADCzE1YAYAAUwBaALLMLAACy2PAE5zElykaVyHiMZF4yh0BiFDylDQFdmMAJ0tljPgMovscoCUM6MNVcI2aqGAFdYBadt0sjrUHqFks00a1lnUbn81j0z1kPtZjgjllTm66R6Gd6bF4vLx-RpB8pRT4XnoI6Lo7GJUHE8pkx1glW4TiErXRnQJqWDuWyAqi+vIDb4lvdi3DsdkJ3UiIe1c+wgRbYyK93so+ezFC9zFYFEHf1ag+AMTA8Yxl1TVdj2VY9tnJSlqW1Xcpn3A0jyVSJG2zRCqQtK82xvO93UyJ9QB9LwE39QMZV0AwHnqAUtH+JwR30ZRmneLx-BTZBdngNJMIzL0HzI0TZEQDBjAFaT5UrWDIkoGhSM9bJnw5ZivzIepjD05QmiqPQ-D4hSsPWJhNm2bdVN7CjEFBeRWUeAxDD5QwPCnADBU8MhdDnZ53k+AwvCg4Sm3hRFkVrDEsSJEk8EEsS1MZV93zeULvw5P8I18-y52aD4vjCsyROwtdrLNLVbPIyS8iot8AyDDkg0Y+QI2MRRZ1jRQXA0X8Spg8ycMgGqJNyFRPjIBNnEgpcOXULyKi0apdL095OslSD5KGsqLP6Ws8wLHDavpWqJuZIdnBCzj1B5Jpcq6-LY0K4LQp2lY9o3c9rN2Mb1PshBlD+ab2S-V56gaRRFGYqodICsHuTAj6Trg2EELCJCLX+xlmhZNkWq5Hk+Vh1aEdlJGl143wgA */
+  /** @xstate-layout N4IgpgJg5mDOIC5QDswHcC0BjA9s1WALgJZ4B0xEANmAMRYBOYAhoWNjhGANoAMAuolAAHHLGIk8QkAA9EARgBMAVjLLeG+esUAWAOwAOZQDYdAGhABPRIoCcqlRt57jtg-L2KAzDoC+vi1RMXHwwIlJkCmo6Ji4wAFsOLj5BJBBRcUlkaTkEJVV1TW19I1MLazzFAzVvHR15Yy95XgaDf0D0DlDw8kYWEmQoAAJcLloIPDAKZAA3HABrKaCugiyyPtZiQZHOMAQtuaxNvBSU6QyJCJzEEx0yYz15W3kvRV4vPUMvcps9LzJPj4dI0vI1jO52iBliFVhEyFRiLA2MgtsMAGY4BhDWIJYRZWC0HHxPERDBMLBgYgzSBnNIXLLXPK8VxkZq2HS6XTGeTyAwGH4IFTVPS2cHc2yggy8Aw6ZSQ6F4WG9RVhAbDI5UGgMcaTaZzRbrFVEADCzE1YAYAAUwBaALLMLAACy2PAE5zElykaVyHiMZF4yh0BiFDylDQFdmMAJ0tljPgMovscoCUM6MNVcI2aqGAFdYBadt0sjrUHqFks00a1lnUbn81j0z1kPtZjgjllTm66R6Gd6bF4vLx-RpB8pRT4XnoI6Lo7GJUHE8pkx1glW4TiErXRnQJqWDuWyAqi+vIDb4lvdi3DsdkJ3UiIe1c+wgRbYyK93so+ezFC9zFYFEHf1ag+AMTA8Yxl1TVdj2VY9tnJSlqW1Xcpn3A0jyVSJG2zRCqQtK82xvO93UyJ9QB9LwE39QMZV0AwHnqAUtH+JwR30ZRmneLx-BTZBdngNJMIzL0HzI0TZEQDBjAFaTh00YxjGlZQfFcHi+MrWDIkoGhSM9bJnw5ZivzIepFMgpoqj0PwNJgrD1iYTZtm3PTewoxBQXkVlHgMQw+UMDwpwAwVPDIXQ52ed5PgMLwoOEpt4URZFawxLEiRJPBBLE-TGVfd83li78OT-CNQvCudmg+L44s0+ycK3M0tVc8jJLyKi3wDIMOSDRj5AjYxFFnWNFBcDRfxquyROwqtIGaiTchUT4yATZxIKXDl1CCiotGqMzFPeAbJUg+Vaqmhz+lrPMC3qiT6RahbmSHZwYs49QeSaUrBvK2NKui2KTsmhKN3PZzdjmgz3IQZQ-mW9kv1eeoGkURRmKqUyIrh7kwIBlYzvqhCwiQi1wcZZoWTZbquR5PlUd2jHZSxpdeN8IA */
   id: "new-connection",
 
   initial: "idle",
@@ -237,10 +237,13 @@ export const newConnectionMachine = setup({
         input: ({ context }) => context,
         onDone: {
           target: "connecting receiver",
-          actions: {
-            type: "saveRemoteUserIdToContext",
-            params: ({ event }) => event.output.remoteUserId,
-          },
+          actions: [
+            {
+              type: "saveRemoteUserIdToContext",
+              params: ({ event }) => event.output.remoteUserId,
+            },
+            "createPeer",
+          ],
         },
       },
     },
