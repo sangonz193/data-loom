@@ -2,7 +2,8 @@ import { MergeDeep } from "type-fest"
 
 import * as Generated from "./types.gen"
 
-export type Database = MergeDeep<Generated.Database, object>
+// eslint-disable-next-line @typescript-eslint/ban-types
+export type Database = MergeDeep<Generated.Database, {}>
 
 export type Json = Generated.Json
 
