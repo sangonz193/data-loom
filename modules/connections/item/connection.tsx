@@ -37,6 +37,8 @@ export function Connection({ connection }: Props) {
   const supabase = createClient()
   const user = useRequiredUser()
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    noClick: true,
+    noKeyboard: true,
     onDrop: (files) => {
       const file = files[0]
       if (file) {
