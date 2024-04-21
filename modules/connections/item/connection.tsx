@@ -109,9 +109,19 @@ export function Connection({ connection }: Props) {
           </h2>
 
           {(state.value === "connecting" ||
+            state.value === "sending request" ||
+            state.value === "waiting for response" ||
             state.value === "connecting with caller") && (
             <span className="animate-pulse text-muted-foreground">
-              Connecting...
+              {(() => {
+                switch (state.value) {
+                  case "sending request":
+                    return "Sending request..."
+                  case "waiting for response":
+                    return "Waiting for confirmation..."
+                }
+                return "Connecting..."
+              })()}
             </span>
           )}
 
@@ -165,7 +175,14 @@ export function Connection({ connection }: Props) {
       </div>
 
       {state.context.fileSharingState && (
-        <div className="relative overflow-hidden rounded-md bg-accent">
+        <div
+          className={cn(
+            "relative overflow-hidden rounded-md bg-accent",
+            (state.value === "sending request" ||
+              state.value === "waiting for response") &&
+              "opacity-50",
+          )}
+        >
           <div
             className="absolute bottom-0 left-0 top-0 bg-green-500/50 transition-[width]"
             style={{
