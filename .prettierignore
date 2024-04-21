@@ -1,3 +1,4 @@
 .vscode
 .next
 node_modules
+supabase/types.gen.ts
