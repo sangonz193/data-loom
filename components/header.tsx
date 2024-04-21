@@ -18,7 +18,7 @@ export async function Header({ user }: Props) {
     .single()
 
   return (
-    <div className="mx-auto h-14 w-full max-w-4xl flex-row items-center gap-3 px-4">
+    <div className="mx-auto h-16 w-full max-w-4xl flex-row items-center gap-3 px-4">
       <Avatar
         animalEmoji={profile?.animals?.emoji}
         animalLabel={profile?.animals?.label}
