@@ -28,7 +28,7 @@
   - It just works!
 - supabase-ssr. A package to configure Supabase Auth to use cookies
 - Styling with [Tailwind CSS](https://tailwindcss.com)
-- Optional deployment with [Supabase Vercel Integration and Vercel deploy](#deploy-your-own)
+- Optional deployment with [Supabase Vercel Integration and Vercel deploy](#deploy-to-vercel)
   - Environment variables automatically assigned to Vercel project
 
 ## Demo
@@ -81,6 +81,14 @@ If you wish to just develop locally and not deploy to Vercel, [follow the steps 
    The starter kit should now be running on [localhost:3000](http://localhost:3000/).
 
 > Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
+
+### Generating db types
+
+This command will reset the local database and generate types for the Supabase client based on the new schema.
+
+```bash
+bunx supabase db reset && bunx supabase gen types typescript --local > supabase/types.gen.ts
+```
 
 ## Feedback and issues
 
