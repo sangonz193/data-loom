@@ -161,15 +161,17 @@ export function Connection({ connection }: Props) {
           />
 
           <div className="relative flex-row items-center gap-2 px-3 py-1">
-            <span className="shrink grow break-words">
-              {state.context.fileSharingState.metadata?.name}
-            </span>
+            <div className="min-h-10 shrink grow flex-row items-center">
+              <span className="w-full break-words">
+                {state.context.fileSharingState.metadata?.name}
+              </span>
+            </div>
 
             {state.can({ type: "clear-file-metadata" }) && (
               <Button
                 onClick={() => send({ type: "clear-file-metadata" })}
                 size="icon"
-                variant="secondary"
+                variant="ghost"
               >
                 <XIcon />
               </Button>

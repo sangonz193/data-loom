@@ -54,7 +54,9 @@ export function Idle({ state, send }: Props) {
           <Button
             variant="secondary"
             className="rounded-l-none"
-            onClick={() => code && send({ type: "redeem-code", code: code })}
+            onClick={() =>
+              code.trim() && send({ type: "redeem-code", code: code.trim() })
+            }
           >
             Join
           </Button>

@@ -14,7 +14,8 @@ type Input = {
 }
 
 interface Context extends Input {
-  code?: string
+  createdCode?: Awaited<ReturnType<typeof createPairingCode>>
+  redeemCode?: string
   remoteUserId?: string
   peerConnection?: RTCPeerConnection
 }
@@ -43,8 +44,14 @@ export const newConnectionMachine = setup({
   },
 
   actions: {
-    setCodeToContext: assign({
-      code: (_, code: string) => code,
+    setCreatedCodeToContext: assign({
+      createdCode: (
+        _,
+        pairingCode: Awaited<ReturnType<typeof createPairingCode>>,
+      ) => pairingCode,
+    }),
+    setRedeemCodeToContext: assign({
+      redeemCode: (_, redeemCode: string) => redeemCode,
     }),
     createPeer: assign({
       peerConnection: () => new RTCPeerConnection(),
@@ -57,12 +64,10 @@ export const newConnectionMachine = setup({
   actors: {
     connectCallerPeerMachine,
     connectReceiverPeerMachine,
-    createCode: fromPromise<{ code: string }, undefined>(() =>
-      createPairingCode(),
-    ),
+    createCode: fromPromise(() => createPairingCode()),
     listenForRedemptions: fromCallback<{ type: "noop" }, Context>((params) => {
       const sendBack = params.sendBack as (event: Event) => void
-      const { supabase, code } = params.input
+      const { supabase, createdCode } = params.input
 
       const channel = supabase
         .channel(Math.random().toString().substring(2, 20))
@@ -72,7 +77,7 @@ export const newConnectionMachine = setup({
             event: "INSERT",
             schema: "public",
             table: "pairing_code_redemptions",
-            filter: `${"pairing_code" satisfies keyof Tables<"pairing_code_redemptions">}=eq.${code}`,
+            filter: `${"pairing_code" satisfies keyof Tables<"pairing_code_redemptions">}=eq.${createdCode!.code}`,
           },
           (payload) => {
             const newRow = payload.new as Tables<"pairing_code_redemptions">
@@ -117,7 +122,7 @@ export const newConnectionMachine = setup({
       },
     ),
     redeemCode: fromPromise(({ input }: { input: Context }) =>
-      redeemPairingCode(input.code!),
+      redeemPairingCode(input.redeemCode!),
     ),
     cleanup: fromCallback(({ input }: { input: Context }) => {
       return () => {
@@ -146,7 +151,7 @@ export const newConnectionMachine = setup({
         "redeem-code": {
           target: "redeeming code",
           actions: {
-            type: "setCodeToContext",
+            type: "setRedeemCodeToContext",
             params: ({ event }) => event.code,
           },
         },
@@ -159,8 +164,8 @@ export const newConnectionMachine = setup({
         onDone: {
           target: "listening for redemptions",
           actions: {
-            type: "setCodeToContext",
-            params: ({ event }) => event.output.code,
+            type: "setCreatedCodeToContext",
+            params: ({ event }) => event.output,
           },
         },
       },

@@ -36,7 +36,7 @@ export function CreateConnectionDialog({ className }: Props) {
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="gap-8">
+      <DialogContent className="gap-6">
         <Content />
       </DialogContent>
     </Dialog>
@@ -64,7 +64,7 @@ function Content() {
     },
   })
 
-  const code = state.context.code
+  const { createdCode } = state.context
 
   const loadingStates: (typeof state.value)[] = [
     "creating code",
@@ -84,8 +84,11 @@ function Content() {
 
       {loadingStates.includes(state.value) && <Spinner />}
 
-      {state.value === "listening for redemptions" && !!code && (
-        <DisplayCode code={code} />
+      {state.value === "listening for redemptions" && !!createdCode && (
+        <DisplayCode
+          code={createdCode.code}
+          createdAt={createdCode.created_at}
+        />
       )}
     </>
   )

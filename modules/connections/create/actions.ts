@@ -1,8 +1,12 @@
 "use server"
 
+import { subMinutes } from "date-fns"
+
 import { logger } from "@/logger"
 import { createAdminClient } from "@/utils/supabase/admin"
 import { createClient } from "@/utils/supabase/server"
+
+import { CODE_EXPIRATION_MINUTES, CODE_LENGTH } from "./constants"
 
 export async function createPairingCode() {
   const supabase = createClient()
@@ -34,11 +38,14 @@ export async function createPairingCode() {
 
   return {
     code: data.code,
+    created_at: data.created_at,
   }
 }
 
 function getRandomCode() {
-  return Math.random().toString().substring(2, 6)
+  return Math.random()
+    .toString()
+    .substring(2, CODE_LENGTH + 2)
 }
 
 export async function redeemPairingCode(code: string) {
@@ -57,6 +64,10 @@ export async function redeemPairingCode(code: string) {
     .from("pairing_codes")
     .select()
     .eq("code", code)
+    .gte(
+      "created_at",
+      subMinutes(new Date(), CODE_EXPIRATION_MINUTES).toISOString(),
+    )
     .single()
 
   if (pairingCodeResponse.error) {
