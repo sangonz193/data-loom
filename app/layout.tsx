@@ -6,6 +6,7 @@ import { PropsWithChildren } from "react"
 
 import { cn } from "@/lib/cn"
 import { themeClassNames } from "@/styles/themeClasses"
+import { ReactQueryProvider } from "@/utils/react-query/provider"
 
 const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
@@ -23,7 +24,9 @@ export default function RootLayout({ children }: PropsWithChildren) {
       <body
         className={cn("bg-background text-foreground", themeClassNames.default)}
       >
-        <main className="min-h-screen bg-background">{children}</main>
+        <main className="min-h-screen bg-background">
+          <ReactQueryProvider>{children}</ReactQueryProvider>
+        </main>
       </body>
     </html>
   )
