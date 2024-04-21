@@ -30,7 +30,8 @@ export async function Header({ user }: Props) {
         {getUserName({
           animalLabel: profile?.animals?.label,
           colorLabel: profile?.colors?.label,
-        })}
+        })}{" "}
+        <span className="text-xs">(You)</span>
       </span>
 
       <CreateConnectionDialog className="ml-auto" />

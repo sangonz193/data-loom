@@ -1,5 +1,5 @@
 import { useMachine } from "@xstate/react"
-import { XIcon } from "lucide-react"
+import { SendIcon, XIcon } from "lucide-react"
 import { useEffect, useRef } from "react"
 import { useDropzone } from "react-dropzone"
 
@@ -185,6 +185,7 @@ export function Connection({ connection }: Props) {
 
         {state.can({ type: "send-file" }) && (
           <Button variant="ghost" onClick={() => inputRef.current?.click()}>
+            <SendIcon className="size-5" />
             Send file
           </Button>
         )}
