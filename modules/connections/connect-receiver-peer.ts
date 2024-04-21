@@ -40,6 +40,7 @@ export const connectReceiverPeerMachine = setup({
       { context: { currentUser, remoteUserId, supabase } },
       answer: RTCSessionDescriptionInit,
     ) => {
+      logger.info("[connectReceiverPeerMachine] sending answer", answer)
       await supabase
         .from("web_rtc_signals")
         .insert({
@@ -50,12 +51,17 @@ export const connectReceiverPeerMachine = setup({
         .then(({ error }) => {
           if (error)
             logger.error("[connectReceiverPeerMachine] sendAnswer error", error)
+          else logger.info("[connectReceiverPeerMachine] sent answer", answer)
         })
     },
     sendIceCandidate: async (
       { context: { currentUser, remoteUserId, supabase } },
       candidate: RTCIceCandidate,
     ) => {
+      logger.info(
+        "[connectReceiverPeerMachine] sending ice candidate",
+        candidate,
+      )
       await supabase
         .from("web_rtc_signals")
         .insert({
@@ -69,6 +75,7 @@ export const connectReceiverPeerMachine = setup({
               "[connectReceiverPeerMachine] sendIceCandidate error",
               error,
             )
+          else logger.info("[connectReceiverPeerMachine] sent ice candidate")
         })
     },
   },

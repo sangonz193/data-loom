@@ -51,6 +51,7 @@ export const connectCallerPeerMachine = setup({
       { context: { currentUser, remoteUserId, supabase } },
       offer: RTCSessionDescriptionInit,
     ) => {
+      logger.info("[connectCallerPeerMachine] sending offer", offer)
       await supabase
         .from("web_rtc_signals")
         .insert({
@@ -60,13 +61,18 @@ export const connectCallerPeerMachine = setup({
         })
         .then(({ error }) => {
           if (error)
-            logger.error("[connectCallerPeerMachine] sendOffer error", error)
+            logger.error(
+              "[connectCallerPeerMachine] error sending offer",
+              error,
+            )
+          else logger.info("[connectCallerPeerMachine] offer sent")
         })
     },
     sendIceCandidate: async (
       { context: { currentUser, remoteUserId, supabase } },
       candidate: RTCIceCandidate,
     ) => {
+      logger.info("[connectCallerPeerMachine] sending ice candidate", candidate)
       await supabase
         .from("web_rtc_signals")
         .insert({
@@ -80,6 +86,7 @@ export const connectCallerPeerMachine = setup({
               "[connectCallerPeerMachine] sendIceCandidate error",
               error,
             )
+          else logger.info("[connectCallerPeerMachine] ice candidate sent")
         })
     },
   },
