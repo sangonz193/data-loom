@@ -155,8 +155,8 @@ export function Connection({ connection }: Props) {
             }}
           />
 
-          <div className="relative flex-row items-center px-3 py-1">
-            <span className="grow">
+          <div className="relative flex-row items-center gap-2 px-3 py-1">
+            <span className="shrink grow whitespace-pre-wrap break-all">
               {state.context.fileSharingState.metadata?.name}
             </span>
 
