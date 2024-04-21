@@ -1,29 +1,28 @@
 "use client"
 
 import { useMutation } from "@tanstack/react-query"
-import { redirect } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 
 import { Spinner } from "@/components/ui/spinner"
 import { logger } from "@/logger"
 import { createClient } from "@/utils/supabase/client"
 
-type Props = {
-  redirectTo: string | undefined
-}
-
-export function AutoSignIn({ redirectTo }: Props) {
+export function AutoSignIn() {
   const { data, mutate, isPending } = useMutation({
     mutationFn: async () => {
       const supabase = createClient()
 
-      return await supabase.auth.signInAnonymously().then((res) => {
+      const data = await supabase.auth.signInAnonymously().then(async (res) => {
         if (res.error) {
           logger.child(res.error).error("[auto-sign-in] Error")
           alert(res.error.message)
         }
+
         return res.data
       })
+
+      return data
     },
   })
 
@@ -43,7 +42,12 @@ export function AutoSignIn({ redirectTo }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  if (data?.user) redirect(redirectTo || "/home")
+  const router = useRouter()
+  useEffect(() => {
+    if (data?.user) {
+      router.refresh()
+    }
+  }, [data?.user, router])
 
   return <>{isPending && <Spinner className="mx-auto mt-5" />}</>
 }

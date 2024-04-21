@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 
 import { AutoSignIn } from "@/modules/auth/auto-sign-in"
-import { createClient } from "@/utils/supabase/client"
+import { createClient } from "@/utils/supabase/server"
 
 export type AutoLoginSearchParams = {
   redirectTo?: string
@@ -22,5 +22,5 @@ export default async function Page(props: {
     redirect(redirectTo || "/home")
   }
 
-  return <AutoSignIn redirectTo={redirectTo} />
+  return <AutoSignIn />
 }
