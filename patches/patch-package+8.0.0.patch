@@ -1,0 +1,22 @@
+diff --git a/node_modules/patch-package/dist/makePatch.js b/node_modules/patch-package/dist/makePatch.js
+index d8d0925..874284a 100644
+--- a/node_modules/patch-package/dist/makePatch.js
++++ b/node_modules/patch-package/dist/makePatch.js
+@@ -120,7 +120,7 @@ function makePatch({ packagePathSpecifier, appPath, packageManager, includePaths
+             try {
+                 // try first without ignoring scripts in case they are required
+                 // this works in 99.99% of cases
+-                spawnSafe_1.spawnSafeSync(`yarn`, ["install", "--ignore-engines"], {
++                spawnSafe_1.spawnSafeSync(`bun`, ["install"], {
+                     cwd: tmpRepoNpmRoot,
+                     logStdErrOnError: false,
+                 });
+@@ -128,7 +128,7 @@ function makePatch({ packagePathSpecifier, appPath, packageManager, includePaths
+             catch (e) {
+                 // try again while ignoring scripts in case the script depends on
+                 // an implicit context which we haven't reproduced
+-                spawnSafe_1.spawnSafeSync(`yarn`, ["install", "--ignore-engines", "--ignore-scripts"], {
++                spawnSafe_1.spawnSafeSync(`bun`, ["install", "--ignore-scripts"], {
+                     cwd: tmpRepoNpmRoot,
+                 });
+             }
