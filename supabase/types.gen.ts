@@ -34,6 +34,98 @@ export type Database = {
   }
   public: {
     Tables: {
+      pairing_code_redemptions: {
+        Row: {
+          created_at: string
+          pairing_code: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          pairing_code: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          pairing_code?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pairing_code_redemptions_pairing_code_fkey"
+            columns: ["pairing_code"]
+            isOneToOne: true
+            referencedRelation: "pairing_codes"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "pairing_code_redemptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pairing_codes: {
+        Row: {
+          code: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pairing_codes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_connections: {
+        Row: {
+          created_at: string
+          user_1_id: string
+          user_2_id: string
+        }
+        Insert: {
+          created_at?: string
+          user_1_id: string
+          user_2_id: string
+        }
+        Update: {
+          created_at?: string
+          user_1_id?: string
+          user_2_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_connections_user_1_id_fkey"
+            columns: ["user_1_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_connections_user_2_id_fkey"
+            columns: ["user_2_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           created_at: string | null
@@ -49,12 +141,68 @@ export type Database = {
         }
         Relationships: []
       }
+      web_rtc_signals: {
+        Row: {
+          created_at: string
+          from_user_id: string
+          id: string
+          payload: Json
+          to_user_id: string
+        }
+        Insert: {
+          created_at?: string
+          from_user_id: string
+          id?: string
+          payload: Json
+          to_user_id: string
+        }
+        Update: {
+          created_at?: string
+          from_user_id?: string
+          id?: string
+          payload?: Json
+          to_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "web_rtc_signals_from_user_id_fkey"
+            columns: ["from_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "web_rtc_signals_to_user_id_fkey"
+            columns: ["to_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      insert_if_code_redemption_exists: {
+        Args: {
+          p_to_user_id: string
+        }
+        Returns: boolean
+      }
+      select_if_own_redemption_exists: {
+        Args: {
+          p_code: string
+        }
+        Returns: boolean
+      }
+      user_has_pairing_code: {
+        Args: {
+          p_code: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
