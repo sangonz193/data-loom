@@ -13,7 +13,7 @@ export function Avatar({
   colorLabel,
   size = "lg",
 }: Props) {
-  const title = [colorLabel, animalLabel].filter(Boolean).join(" ")
+  const title = getUserName({ animalLabel, colorLabel })
 
   return (
     <div
@@ -28,4 +28,14 @@ export function Avatar({
       </span>
     </div>
   )
+}
+
+export function getUserName({
+  animalLabel,
+  colorLabel,
+}: {
+  animalLabel: string | undefined
+  colorLabel: string | undefined
+}) {
+  return [colorLabel, animalLabel].filter(Boolean).join(" ")
 }

@@ -1,7 +1,7 @@
 import { useMachine } from "@xstate/react"
 import { useEffect, useRef } from "react"
 
-import { Avatar } from "@/components/avatar"
+import { Avatar, getUserName } from "@/components/avatar"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -110,10 +110,13 @@ export function Connection({ connection }: Props) {
         <AlertDialog open>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogTitle>Accept the file?</AlertDialogTitle>
               <AlertDialogDescription>
-                This will delete the connection. To communicate with this device
-                again, you will need to create a new connection.
+                {getUserName({
+                  colorLabel: remoteUser?.colors?.label,
+                  animalLabel: remoteUser?.animals?.label,
+                })}{" "}
+                wants to send you a file. Do you want to accept it?
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -121,7 +124,7 @@ export function Connection({ connection }: Props) {
                 Cancel
               </AlertDialogCancel>
               <AlertDialogAction onClick={() => send({ type: "accept" })}>
-                Delete
+                Accept
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
