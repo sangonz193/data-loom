@@ -1,6 +1,7 @@
 import { useMachine } from "@xstate/react"
 import { XIcon } from "lucide-react"
 import { useEffect, useRef } from "react"
+import { useDropzone } from "react-dropzone"
 
 import { Avatar, getUserName } from "@/components/avatar"
 import {
@@ -35,6 +36,14 @@ export function Connection({ connection }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
   const user = useRequiredUser()
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop: (files) => {
+      const file = files[0]
+      if (file) {
+        send({ type: "send-file", file })
+      }
+    },
+  })
 
   const remoteUserNumber = user.id === connection.user_1_id ? 2 : 1
   const remoteUser = connection[`user_${remoteUserNumber}`]
@@ -74,11 +83,12 @@ export function Connection({ connection }: Props) {
   return (
     <div
       className={cn(
-        "gap-3 rounded-md border border-primary/50 bg-card p-4",
+        "relative gap-3 rounded-md border border-primary/50 bg-card p-4",
         themeClassNames[
           (remoteUser?.color_id as keyof typeof themeClassNames) || "default"
         ],
       )}
+      {...getRootProps()}
     >
       <div className="flex-row gap-3">
         <Avatar
@@ -109,15 +119,10 @@ export function Connection({ connection }: Props) {
         </div>
 
         <input
-          ref={inputRef}
-          type="file"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0]
-            if (file) {
-              send({ type: "send-file", file })
-            }
-          }}
+          {...getInputProps({
+            ref: inputRef,
+            className: "hidden",
+          })}
         />
 
         {state.value === "prompting user to accept connection" && (
@@ -156,7 +161,7 @@ export function Connection({ connection }: Props) {
           />
 
           <div className="relative flex-row items-center gap-2 px-3 py-1">
-            <span className="shrink grow whitespace-pre-wrap break-all">
+            <span className="shrink grow break-words">
               {state.context.fileSharingState.metadata?.name}
             </span>
 
@@ -181,6 +186,25 @@ export function Connection({ connection }: Props) {
             Send file
           </Button>
         )}
+      </div>
+
+      <div className="pointer-events-none absolute inset-0">
+        <div
+          className={cn(
+            "absolute inset-0 bg-accent opacity-0 transition-opacity duration-300",
+            isDragActive && "opacity-70",
+          )}
+        />
+
+        <span
+          className={cn(
+            "opacity-0",
+            "my-auto text-center text-lg text-accent-foreground transition-opacity",
+            isDragActive && "opacity-70",
+          )}
+        >
+          Drop the file here to send it
+        </span>
       </div>
     </div>
   )
