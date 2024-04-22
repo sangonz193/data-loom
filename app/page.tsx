@@ -11,9 +11,9 @@ export default function Index() {
       </h1>
 
       <span className="mx-auto mt-4 w-full max-w-xl text-center text-lg text-muted-foreground">
-        Seamless file and text sharing directly between devices. Built on the
-        power of WebRTC technology, Data Loom ensures your data transfers are
-        secure, fast, and direct—no middlemen involved.
+        Seamless file sharing directly between devices. Built on the power of
+        WebRTC technology, Data Loom ensures your data transfers are secure,
+        fast, and direct—no middlemen involved.
       </span>
 
       <Button className="group mx-auto mt-10" size="lg" asChild>
