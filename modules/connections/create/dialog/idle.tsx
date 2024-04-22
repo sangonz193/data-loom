@@ -58,7 +58,7 @@ export function Idle({ state, send }: Props) {
               code.trim() && send({ type: "redeem-code", code: code.trim() })
             }
           >
-            Join
+            Connect
           </Button>
         </div>
       </div>

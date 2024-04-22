@@ -216,7 +216,7 @@ export function Connection({ connection }: Props) {
         {state.can({ type: "send-file" }) && (
           <Button variant="ghost" onClick={() => inputRef.current?.click()}>
             <SendIcon className="size-5" />
-            Send file
+            Send File
           </Button>
         )}
       </div>

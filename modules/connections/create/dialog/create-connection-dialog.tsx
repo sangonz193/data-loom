@@ -31,7 +31,7 @@ export function CreateConnectionDialog({ className, size = "sm" }: Props) {
       <DialogTrigger asChild>
         <Button className={className} size={size}>
           <PlusCircleIcon className="size-5" />
-          Connect device
+          Connect Device
         </Button>
       </DialogTrigger>
 
