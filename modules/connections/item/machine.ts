@@ -37,7 +37,7 @@ interface Context extends Input {
     metadata: z.infer<typeof fileMetadataSchema>
     transferredBytes: number
   }
-  requestId?: string
+  request?: Tables<"file_sharing_request">
 }
 
 type Event =
@@ -45,10 +45,7 @@ type Event =
   | ReceiveFileOutputEvent
   | SendFileOutputEvent
   | ListenToFileRequestResponseTableOutputEvent
-  | {
-      type: "send-file"
-      file: File
-    }
+  | { type: "send-file"; file: File }
   | {
       type: "connection-request-received"
       request: Tables<"file_sharing_request">
@@ -118,8 +115,8 @@ export const connectionMachine = setup({
         transferredBytes,
       }),
     }),
-    setRequestId: assign({
-      requestId: (_, requestId: string) => requestId,
+    setRequest: assign({
+      request: (_, request: Tables<"file_sharing_request">) => request,
     }),
     sendResponse: ({ context }, accept: boolean) => {
       sendResponse({ accept, context })
@@ -173,12 +170,14 @@ export const connectionMachine = setup({
       event.response.accepted,
   },
 }).createMachine({
-  /** @xstate-layout N4IgpgJg5mDOIC5QGMD2A7dZkBcCWGAdHhADZgDEsY6EAtAGZ7kDaADALqKgAOqsefBm4gAHogBMAZgkAOQgFYAjAqlqJAFgWyFEgDQgAnoh1tFCgJxtZANiWy5G2RoC+Lg2kzYh6YmUqeWLgE6HQATmAAjgCucDjh2GB4AG6Q7FxIIHwCPiLiCNJyiipqMlo6+kaIAOwS1YQqcs42FhZSCtUWbh4YQT5+5BTI5ACGYYzMYHQAtmA4IxAj8+ki2YIheZJs1RqENjZSsjIWNtVsSmwaBsYI+2aN1Tq6bAod1d0ggd4hhF-B6FAKBAMGBiOhkqgANagv44ADCI1I5DCAAUwGAwgBZEbIAAWeCwK0ya1ymXySiU1QUhAk9lqr3OFkpNmuklk8gcUm27IsEgUGiUJw+sJ+1FoBKgAAImIMeOiwr9et8MLB5jhsLiRgCwETePx1sIyYhKVIlIRWq1tDZttoNJUblyJIQNGwbBodny2DI6lJhUrgkQxRAJdLJlQaPQZaDZvNFstOKt9aTQOT3bs7DJau7dBJLqyEJT6hZVNIlBJTho7Eo-V4A74gyGo+HaBNyIQeGFUFAIrBYLqskmNkaC04zds2HVVILZCd87IzQo2EulFz+UobLIa30fh3UNMePgAZLotQwpKcKhJTjkGAD5KRRgKNfbzh+yShynJLz6sp+abTeyboslUCC1AuLSvDsBzWu87ifP6-S7vuh5SieGLnpez53g+6BAtgpAEjqCbEoOhqfgUUiVoQ7RWCc7RUhoUj5taUiEFB1oUs01RUluyq+CKR4AO6CLi96IsiFByhihBxjimpeKQb6kegmwIJR1jUbmS6LtYRyyPmWjUhONhNI81R2JYCi8XWhARDeKSNmGdlJKkragsChLEXqOQfmIxrVKa5oWlaNrOPaiCWPIVJyBYjwWHaJk2NZ-TOQ5R5NqlrlRoQMYLEsIxKT5ZF+SOOx7CudSaNFubATco7UZZlbehu1TVnBOG2YkaVShlXVZZM7adt2cB9l5A5FSpw5KPV46TqaFgziZ+aHLsVhAZolFSMWQrtQhooRiGEQxHEQIgmCELQoQQYAEpRLEqqFQak3kZoKgNK1Fnzm67rVPmsWsSc-K0q0K4CslPyCSM6zpagZ49nw6DUBQUYJMdqoJLACPUI9yYlRodpBRapSyGwVhMSB5a7JRNgdBUFKvMW4NEJD0M9bDkrwyqlAo0d93xJziM6koGTeU9qn406FqtMTpNevm5nUlo1pLjaXIrkzvhYShHN3SdHmggSF0wntRBa4duuqgghuoMgSwhOkOO+fk6nyDIKs6eyhzy5YigSOW64HHyvJdB86CoBAcAiDhiYTapdC1YgdDUlLOgLdaRxqG1PS1v0JDkDHYvDrSPtHMWOhSDTM7mfLdh7K6S5SAFhyLrB2fbkQAlQAXuP5NxFg0nSMjrocdRKPmfK7JyFIT0yshnK4u05-t4rpZM3dO8alaT9m5n2Lmprj50zquvj8UkwxEga4Ne4HiGaFnheV7IDe2Em8942Fy91rUrSLz7I8gcqTe3kDmU4boFpZ3gkvDue0hIiTEkiDE69irOwCvULaDg5C0jQb9ECZx5BtDaNNU0rULRX0yo5fOJFY5TS0GYTQxclynDnsWfM2gnTzjqG6VQkUvRXwbEeXmcRkHv3yOWF4A8-7MMAQoP6CgbC+1UE4DQC15FJUXu3XwLNtYMHZgLagIjxbhVAu0Z0DMAq2DdFtX0Gi+KEDNoIi2OBDHDgAgoiuLRTSWG4q6cmNwApGT9jTSkcgpxWTcC4IAA */
+  /** @xstate-layout N4IgpgJg5mDOIC5QGMD2A7dZkBcCWGAdHhADZgDEsY6EAtAGZ7kDaADALqKgAOqsefBm4gAHogBMAZgkAOQgFYAjAoAsANgDsUzQE5Vq6QBoQAT0SyFbRQtmbNsy7seWAvq5NpM2IemJlKLyxcAnQ6ACcwAEcAVzgcCOwwPAA3SHYuJBA+AV8RcQRpOUUVDW09A2MzRE0JTUIVCQVtKTYNWV1dd08MYN9-cgpkcgBDcMZmMDoAWzAcEYgR+YyRHMFQ-Mk2TVVCdXUpXQddBSkrCRNzBH3rRtUlTXUFZ10pKW6QIJ9Qwi+Q9CgFAgGDAxHQKVQAGtQX8cABhEakcjhAAKYDA4QAsiNkAALPBYFZZNZ5LIFJQPBSECRKWRadSqTS2VQKS6SRyEWQSCS6JT7JQ8qSGBQfWE-ai0AlQAAETEGPHR4V+vW+GFg8xw2FxIwBYCJvH462EZMQDykSkInU6pwF6iUqk6bIQrQkhFUbAObCK9xUUnUopVISIEogUtlkyoNHoctBs3mi2WnFWhtJoHJjN2dvNUi5EkM2nUToe9ROrV00gUB002wD3iDfhDYZjkdoE3IhB44VQUEisFg+uyKY2JoQ9tkFu2bHtTXtZyFTvHbqtznNGkO49rfR+ndQ0x4+AB0pi1HC0pwqGlOOQYH30rFGAoV5vOAHJOHack5fqykrNPH+x5J1agtSteVAuQjjqTdVT8Hc9wPGVjwxM8LyfW973QIFsFIAk9STYkh2ND9CiFdRCDOXk9G2P9TiddQ2CkQgdjtZwmieWl3g8T5A36MVDwAd0EXE70RZEKAVDFCATHFtW8UhX0I9BNmdd15BkD1Oj5BwuSdFkqS9O1aR2HQHlkaD60ISJr1SJsIys5I0jbUFgUJfCDVyd8xFNbQLWXG0JDtB1dCdZ55CZJpxynWQ2F0dQui4jDLKSGzD2bezUimGNCDjBYlhGBSPKIrzRwzPYlGzXN8z9XTFwot4mh2OolHino636dKUlswYOsyyYOy7Hs4H7NzB0KpSRzHCdq2nZRVDnVQnRzXZdA9aRLBkNQlHM-pG0PSJYniIEQTBCFoUIEMACVojidUCqNcbiLzFQGk0Wk2DYZp3QeJ0jkY2KHVkAwVDYOxONarciH4kZ1lS1BT17Ph0GoCgY0SA71USWBEeoO7U2KypLWXBjXgUCQGKdALdlIuaGTNBk5u2n4oZhmUGDh6UEbVShUf2m6Ek5pG9SUTJ3Pu5SCeXFbDjOMmpCAww3T0AVopzWLuUZog0IQjnrsOlzQQJU6YR4n4tbDXn4gQQ3UGQJZQgyXHPIKIUQfIsm4t5LRHAuaoECZXRFG5P1pEah0JHcLj0FQCA4BEDDkzG5S6ELX3k8Id6M8zzOGQ1vwSHIBOxZHGlnk5Q5q3UOQWR2TQgLtPYPvUcdmpZI5c+VNqpULvGCnsAO-yb+iuRkRkKbUTluVimL9GaGL-QSk3gyjLqwG7p3TQ0XZAeYvlyrabYKb0N0PTOWxeW2BmF87og4P3MMkNPc9L2Qa90MXh7RqLx76KpGkQb9TSMVZBAVsIHaQDpKynAAu3PiMpBI4GErbJEGI15FWduUcizgXCxW0KyX21Z5CvBWvoZqU47RmSvhDPwHUV6oI-umKw1JDAgwCs0JkTIQpck5AKQw-J6JegoeDGC51l57V1uqOhykAofWpEof+Hs5HOB+pWQODopwnA+rFeeQiLLM21mzeGcBsarwIonEchggJnDdAoSBAVd5N0Edxa+fgzZiPRjgSRI5zR0nIloAw5Y5CzUsfpIOHFLCyBzBQ9wQA */
   id: "connection",
 
   initial: "idle",
 
-  context: ({ input }) => input,
+  context: ({ input }) => ({
+    ...input,
+  }),
 
   states: {
     idle: {
@@ -203,14 +202,8 @@ export const connectionMachine = setup({
           target: "prompting user to accept connection",
           actions: [
             {
-              type: "setRequestId",
-              params: ({ event }) => event.request.id,
-            },
-            {
-              type: "setFileMetadataToContext",
-              params: ({ event }) =>
-                (event.request.payload as z.infer<typeof requestPayloadSchema>)
-                  .file,
+              type: "setRequest",
+              params: ({ event }) => event.request,
             },
           ],
         },
@@ -278,7 +271,18 @@ export const connectionMachine = setup({
       on: {
         accept: {
           target: "accepting request",
-          actions: ["createPeerConnection", "clearFileMetadataFromContext"],
+          actions: [
+            "createPeerConnection",
+            {
+              type: "setFileMetadataToContext",
+              params: ({ context }) =>
+                (
+                  context.request!.payload as z.infer<
+                    typeof requestPayloadSchema
+                  >
+                ).file,
+            },
+          ],
         },
         decline: {
           target: "idle",
@@ -363,8 +367,8 @@ export const connectionMachine = setup({
         onDone: {
           target: "waiting for response",
           actions: {
-            type: "setRequestId",
-            params: ({ event }) => event.output.id,
+            type: "setRequest",
+            params: ({ event }) => event.output,
           },
         },
       },
@@ -377,7 +381,7 @@ export const connectionMachine = setup({
 
         input: ({ context }) => ({
           supabase: context.supabase,
-          requestId: context.requestId!,
+          requestId: context.request!.id,
         }),
       },
 
@@ -413,12 +417,12 @@ async function sendResponse({
   context: Context
   accept: boolean
 }) {
-  const { supabase, requestId } = context
+  const { supabase, request } = context
 
   const { data, error } = await supabase
     .from("file_sharing_request_response")
     .insert({
-      request_id: requestId!,
+      request_id: request!.id,
       accepted: accept,
     })
 

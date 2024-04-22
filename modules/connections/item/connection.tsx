@@ -1,24 +1,15 @@
 import { useMachine } from "@xstate/react"
-import { filesize } from "filesize"
-import { SendIcon, XIcon } from "lucide-react"
+import { SendIcon } from "lucide-react"
 import { useEffect, useRef } from "react"
 import { useDropzone } from "react-dropzone"
 
 import { Avatar, getUserName } from "@/components/avatar"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { cn } from "@/lib/cn"
 import { themeClassNames } from "@/styles/themeClasses"
 import { createClient } from "@/utils/supabase/client"
 
+import { FileTransferRequestDialog } from "./file-transfer-request-dialog"
+import { FileTransferState } from "./file-transfer-state"
 import { connectionMachine } from "./machine"
 import { Button } from "../../../components/ui/button"
 import { useRequiredUser } from "../../auth/use-user"
@@ -110,15 +101,12 @@ export function Connection({ connection }: Props) {
 
           {(state.value === "connecting" ||
             state.value === "sending request" ||
-            state.value === "waiting for response" ||
             state.value === "connecting with caller") && (
             <span className="animate-pulse text-muted-foreground">
               {(() => {
                 switch (state.value) {
                   case "sending request":
                     return "Sending request..."
-                  case "waiting for response":
-                    return "Waiting for confirmation..."
                 }
                 return "Connecting..."
               })()}
@@ -139,75 +127,20 @@ export function Connection({ connection }: Props) {
         />
 
         {state.value === "prompting user to accept connection" && (
-          <AlertDialog open>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>
-                  File Transfer request from{" "}
-                  {getUserName({
-                    colorLabel: remoteUser?.colors?.label,
-                    animalLabel: remoteUser?.animals?.label,
-                  })}
-                </AlertDialogTitle>
-                <AlertDialogDescription>
-                  {getUserName({
-                    colorLabel: remoteUser?.colors?.label,
-                    animalLabel: remoteUser?.animals?.label,
-                  })}{" "}
-                  is sending you {'"'}
-                  {state.context.fileSharingState?.metadata.name}
-                  {'"'} (
-                  {filesize(state.context.fileSharingState?.metadata.size || 0)}
-                  ). Do you want to accept it?
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel onClick={() => send({ type: "decline" })}>
-                  Cancel
-                </AlertDialogCancel>
-                <AlertDialogAction onClick={() => send({ type: "accept" })}>
-                  Accept
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <FileTransferRequestDialog
+            state={state}
+            send={send}
+            remoteUser={remoteUser}
+          />
         )}
       </div>
 
       {state.context.fileSharingState && (
-        <div
-          className={cn(
-            "relative overflow-hidden rounded-md bg-accent",
-            (state.value === "sending request" ||
-              state.value === "waiting for response") &&
-              "opacity-50",
-          )}
-        >
-          <div
-            className="absolute bottom-0 left-0 top-0 bg-green-500/50 transition-[width]"
-            style={{
-              width: `${getProgressPercentage(state.context.fileSharingState.transferredBytes, state.context.fileSharingState.metadata.size)}%`,
-            }}
-          />
-
-          <div className="relative flex-row items-center gap-2 px-3 py-1">
-            <div className="min-h-10 shrink grow flex-row items-center">
-              <span className="w-full break-words">
-                {state.context.fileSharingState.metadata?.name}
-              </span>
-            </div>
-
-            {state.can({ type: "clear-file-metadata" }) && (
-              <Button
-                onClick={() => send({ type: "clear-file-metadata" })}
-                size="icon"
-                variant="ghost"
-              >
-                <XIcon />
-              </Button>
-            )}
-          </div>
-        </div>
+        <FileTransferState
+          state={state}
+          fileSharingState={state.context.fileSharingState}
+          send={send}
+        />
       )}
 
       <div className="flex-row-reverse gap-3">
@@ -241,11 +174,4 @@ export function Connection({ connection }: Props) {
       </div>
     </div>
   )
-}
-
-function getProgressPercentage(
-  transferredBytes: number,
-  totalBytes: number,
-): number {
-  return (transferredBytes / totalBytes) * 100
 }

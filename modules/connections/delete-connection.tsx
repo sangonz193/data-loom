@@ -25,8 +25,8 @@ export function DeleteConnection({ connection }: Props) {
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button size="icon" variant="destructive">
-          <span className="sr-only">Delete</span>
+        <Button size="icon" variant="destructive" title="Delete connection">
+          <span className="sr-only">Delete connection</span>
           <TrashIcon className="size-5" />
         </Button>
       </AlertDialogTrigger>
