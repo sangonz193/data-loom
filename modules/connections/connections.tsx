@@ -43,21 +43,23 @@ export function Connections() {
 
 function EmptyState() {
   return (
-    <div>
+    <div className="mt-3 gap-4">
       <SquirrelIcon
         className="mx-auto size-40 text-muted-foreground opacity-50"
         strokeWidth={0.5}
       />
 
-      <div className="mt-3 text-center text-xl text-muted-foreground">
-        No connections yet
+      <div>
+        <div className="text-center text-xl text-muted-foreground">
+          No connections yet
+        </div>
+
+        <div className="mt-1 text-center text-muted-foreground">
+          To start sharing files, create a connection with another device.
+        </div>
       </div>
 
-      <div className="mt-1 text-center text-muted-foreground">
-        To start sharing files, create a connection with another device.
-      </div>
-
-      <CreateConnectionDialog size="lg" className="mt-6" />
+      <CreateConnectionDialog size="default" className="mt-10" />
     </div>
   )
 }
