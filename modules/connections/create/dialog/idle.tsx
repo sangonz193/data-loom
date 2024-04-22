@@ -44,23 +44,23 @@ export function Idle({ state, send }: Props) {
           Already have a code from another device? Enter it here.
         </span>
 
-        <div className="mt-3 flex-row">
+        <form
+          className="mt-3 flex flex-row"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (code.trim()) send({ type: "redeem-code", code: code.trim() })
+          }}
+        >
           <Input
             value={code}
             onChange={(e) => setCode(e.target.value)}
             className="shrink rounded-r-none"
           />
 
-          <Button
-            variant="secondary"
-            className="rounded-l-none"
-            onClick={() =>
-              code.trim() && send({ type: "redeem-code", code: code.trim() })
-            }
-          >
+          <Button type="submit" variant="secondary" className="rounded-l-none">
             Connect
           </Button>
-        </div>
+        </form>
       </div>
     </>
   )
