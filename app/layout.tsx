@@ -4,6 +4,7 @@ import "../styles/reset.css"
 import { GeistSans } from "geist/font/sans"
 import { PropsWithChildren } from "react"
 
+import { Footer } from "@/components/footer"
 import { cn } from "@/lib/cn"
 import { AuthProvider } from "@/modules/auth/provider/server"
 import { themeClassNames } from "@/styles/themeClasses"
@@ -38,7 +39,7 @@ export default async function RootLayout({ children }: PropsWithChildren) {
     <html lang="en" className={GeistSans.className}>
       <body
         className={cn(
-          "bg-background text-foreground",
+          "overflow-auto bg-background text-foreground",
           themeClassNames[
             (user?.color_id as keyof typeof themeClassNames) || "default"
           ],
@@ -49,6 +50,8 @@ export default async function RootLayout({ children }: PropsWithChildren) {
             <AuthProvider>{children}</AuthProvider>
           </ReactQueryProvider>
         </main>
+
+        <Footer />
       </body>
     </html>
   )

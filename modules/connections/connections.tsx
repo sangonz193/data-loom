@@ -43,7 +43,7 @@ export function Connections() {
 
 function EmptyState() {
   return (
-    <div className="mt-3 gap-4">
+    <div className="mt-2 gap-3">
       <SquirrelIcon
         className="mx-auto size-40 text-muted-foreground opacity-50"
         strokeWidth={0.5}
@@ -59,7 +59,7 @@ function EmptyState() {
         </div>
       </div>
 
-      <CreateConnectionDialog size="default" className="mt-10" />
+      <CreateConnectionDialog size="lg" className="mt-12" />
     </div>
   )
 }
