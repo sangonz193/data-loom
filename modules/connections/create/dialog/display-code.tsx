@@ -112,9 +112,13 @@ function ExpNotice({
   }
 
   return (
-    <span className="mt-4 text-sm text-popover-foreground/60">
-      Enter this code on the other device to connect. The code will expire in{" "}
-      {isExpired ? "0 seconds" : formatDuration(duration)}.
+    <span className="mt-4 whitespace-pre-wrap text-sm text-popover-foreground/60">
+      Enter this code on the other device to connect.{"\n"}The code will expire
+      in{" "}
+      <span className="text-foreground">
+        {isExpired ? "0 seconds" : formatDuration(duration)}
+      </span>
+      .
     </span>
   )
 }
