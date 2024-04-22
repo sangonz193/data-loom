@@ -7,6 +7,7 @@ import { Database, Tables } from "@/supabase/types"
 import { createPairingCode, redeemPairingCode } from "./actions"
 import { connectCallerPeerMachine } from "../connect-caller-peer"
 import { connectReceiverPeerMachine } from "../connect-receiver-peer"
+import { getIceServers } from "../ice-candidates"
 
 type Input = {
   supabase: SupabaseClient<Database>
@@ -56,14 +57,7 @@ export const newConnectionMachine = setup({
     createPeer: assign({
       peerConnection: () =>
         new RTCPeerConnection({
-          iceServers: [
-            {
-              urls: [
-                "stun:stun1.l.google.com:19302",
-                "stun:stun3.l.google.com:19302",
-              ],
-            },
-          ],
+          iceServers: getIceServers(),
         }),
     }),
     saveRemoteUserIdToContext: assign({

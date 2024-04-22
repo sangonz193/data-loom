@@ -3,7 +3,7 @@ import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 
-export default function Index() {
+export default async function Index() {
   return (
     <div className="my-auto px-4 py-10">
       <h1 className="mx-auto text-center text-7xl font-bold tracking-tight md:text-8xl">

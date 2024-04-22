@@ -1,20 +1,30 @@
 "use client"
 
 import { SquirrelIcon } from "lucide-react"
+import { useEffect } from "react"
 
 import { Spinner } from "@/components/ui/spinner"
 
 import { CreateConnectionDialog } from "./create/dialog/create-connection-dialog"
 import { IncomingFileSharingRequestsProvider } from "./file-sharing-requests/incoming-file-sharing-requests"
+import { setIceServers } from "./ice-candidates"
 import { Connection } from "./item/connection"
 import {
   useInvalidateUserConnectionsQuery,
   useUserConnectionsQuery,
 } from "./use-user-connections"
 
-export function Connections() {
+type Props = {
+  iceServers: RTCIceServer[]
+}
+
+export function Connections({ iceServers }: Props) {
   const { data, isLoading } = useUserConnectionsQuery()
   useInvalidateUserConnectionsQuery()
+
+  useEffect(() => {
+    setIceServers(iceServers)
+  }, [iceServers])
 
   return (
     <IncomingFileSharingRequestsProvider>
