@@ -20,7 +20,7 @@ export const metadata = {
   metadataBase: new URL(defaultUrl),
   title: "Data Loom | Seamless Real-Time File Sharing",
   description:
-    "Data Loom offers instant, secure, and anonymous file and text sharing directly between devices. Start sharing immediately with one-click access—no sign up required.",
+    "Data Loom offers instant, secure, and anonymous file sharing directly between devices. Start sharing immediately with one-click access—no sign up required.",
 }
 
 export default async function RootLayout({ children }: PropsWithChildren) {
