@@ -86,7 +86,7 @@ export function Connection({ connection }: Props) {
   return (
     <div
       className={cn(
-        "relative gap-3 rounded-md border border-primary/50 bg-card p-4",
+        "relative gap-3 rounded-lg border border-primary/50 bg-card p-4",
         themeClassNames[
           (remoteUser?.color_id as keyof typeof themeClassNames) || "default"
         ],
