@@ -28,7 +28,10 @@ export function FileTransferState({ state, fileSharingState, send }: Props) {
       <div className="relative mb-1 flex-row items-center gap-2 py-1 pl-3 pr-1">
         <div className="min-h-10 shrink grow flex-row items-center gap-2">
           <FileIcon className="size-5" />
-          <span className="w-full break-words">
+          <span
+            className="shrink truncate"
+            title={fileSharingState.metadata?.name}
+          >
             {fileSharingState.metadata?.name}
           </span>
         </div>
