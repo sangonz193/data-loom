@@ -2,6 +2,7 @@
 
 import { useMachine } from "@xstate/react"
 import { PlusCircleIcon } from "lucide-react"
+import { ComponentProps } from "react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -21,13 +22,14 @@ import { newConnectionMachine } from "../new-connection"
 
 type Props = {
   className?: string
+  size?: ComponentProps<typeof Button>["size"]
 }
 
-export function CreateConnectionDialog({ className }: Props) {
+export function CreateConnectionDialog({ className, size = "sm" }: Props) {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button className={className} size="sm">
+        <Button className={className} size={size}>
           <PlusCircleIcon className="size-5" />
           Connect device
         </Button>

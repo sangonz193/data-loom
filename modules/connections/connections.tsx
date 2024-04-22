@@ -1,7 +1,10 @@
 "use client"
 
+import { SquirrelIcon } from "lucide-react"
+
 import { Spinner } from "@/components/ui/spinner"
 
+import { CreateConnectionDialog } from "./create/dialog/create-connection-dialog"
 import { IncomingFileSharingRequestsProvider } from "./file-sharing-requests/incoming-file-sharing-requests"
 import { Connection } from "./item/connection"
 import {
@@ -32,12 +35,29 @@ export function Connections() {
           />
         ))}
 
-        {!isLoading && !data?.length && (
-          <div className="text-center text-muted-foreground">
-            No connections yet
-          </div>
-        )}
+        {!isLoading && !data?.length && <EmptyState />}
       </div>
     </IncomingFileSharingRequestsProvider>
+  )
+}
+
+function EmptyState() {
+  return (
+    <div>
+      <SquirrelIcon
+        className="mx-auto size-40 text-muted-foreground opacity-50"
+        strokeWidth={0.5}
+      />
+
+      <div className="mt-3 text-center text-xl text-muted-foreground">
+        No connections yet
+      </div>
+
+      <div className="mt-1 text-center text-muted-foreground">
+        To start sharing files, create a connection with another device.
+      </div>
+
+      <CreateConnectionDialog size="lg" className="mt-6" />
+    </div>
   )
 }

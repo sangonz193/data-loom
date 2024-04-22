@@ -1,9 +1,9 @@
 import { User } from "@supabase/supabase-js"
 
-import { CreateConnectionDialog } from "@/modules/connections/create/dialog/create-connection-dialog"
 import { createClient } from "@/utils/supabase/server"
 
 import { Avatar, getUserName } from "./avatar"
+import { HeaderCreateConnection } from "./header-create-connection"
 
 type Props = {
   user: User
@@ -34,7 +34,7 @@ export async function Header({ user }: Props) {
         <span className="text-xs">(You)</span>
       </span>
 
-      <CreateConnectionDialog className="ml-auto" />
+      <HeaderCreateConnection className="ml-auto" />
     </div>
   )
 }
