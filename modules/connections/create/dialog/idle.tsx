@@ -29,7 +29,7 @@ export function Idle({ state, send }: Props) {
             </span>
 
             <span className="whitespace-pre-wrap text-start text-sm text-muted-foreground">
-              Start connecting a new device by generating a unique code.
+              Start connecting a device by generating a code.
             </span>
           </div>
         </Button>
