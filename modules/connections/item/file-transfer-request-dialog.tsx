@@ -41,12 +41,12 @@ export function FileTransferRequestDialog({ send, state, remoteUser }: Props) {
     const totalSize = metadata.reduce((acc, file) => acc + file.size, 0)
 
     if (metadata.length !== 1) {
-      description += ` ${metadata.length} files`
+      description += ` ${metadata.length} files (${filesize(totalSize)} total)`
     } else {
-      description += ` "${metadata[0].name}"`
+      description += ` "${metadata[0].name}" (${filesize(totalSize)})`
     }
 
-    description += ` (${filesize(totalSize)}). Do you want to accept it?`
+    description += `. Do you want to accept it?`
 
     return description
   }, [metadata, remoteUser?.animals?.label, remoteUser?.colors?.label])
