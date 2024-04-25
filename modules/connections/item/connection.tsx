@@ -43,7 +43,7 @@ export function Connection({ connection }: Props) {
   const remoteUser = connection[`user_${remoteUserNumber}`]
   const remoteUserId = connection[`user_${remoteUserNumber}_id`]
 
-  const [state, send] = useMachine(connectionMachine, {
+  const [state, send, actor] = useMachine(connectionMachine, {
     input: {
       supabase,
       currentUser: user,
@@ -136,11 +136,7 @@ export function Connection({ connection }: Props) {
       </div>
 
       {state.context.fileSharingState && (
-        <FileTransferState
-          state={state}
-          fileSharingState={state.context.fileSharingState}
-          send={send}
-        />
+        <FileTransferState actor={actor} send={send} />
       )}
 
       <div className="flex-row-reverse gap-3">

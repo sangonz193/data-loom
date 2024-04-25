@@ -3,7 +3,7 @@ import { z } from "zod"
 
 import { logger } from "@/logger"
 
-import { fileMetadataSchema } from "./item/receive-file"
+import { fileMetadataSchema } from "./receive-file"
 
 const CHUNK_SIZE = 1024 * 50
 

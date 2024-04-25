@@ -1,15 +1,22 @@
 import { User } from "@supabase/supabase-js"
-import { assign, enqueueActions, fromPromise, setup } from "xstate"
+import {
+  ActorRefFrom,
+  assign,
+  enqueueActions,
+  fromPromise,
+  setup,
+  stopChild,
+} from "xstate"
 import { z } from "zod"
 
 import { Tables } from "@/supabase/types"
 import { createClient } from "@/utils/supabase/client"
 
 import {
-  ReceiveFileOutputEvent,
   fileMetadataSchema,
-  receiveFile,
-} from "./receive-file"
+  receiveFileActor,
+} from "../../data-transfer/receive-file"
+import { SendFileOutputEvent, sendFile } from "../../data-transfer/send-file"
 import { connectCallerPeerMachine } from "../connect-caller-peer"
 import { connectReceiverPeerMachine } from "../connect-receiver-peer"
 import {
@@ -21,7 +28,6 @@ import {
   PeerConnectionEventsOutputEvents,
   peerConnectionEvents,
 } from "../peer-connection-events"
-import { SendFileOutputEvent, sendFile } from "../send-file"
 
 type Input = {
   currentUser: User
@@ -33,26 +39,28 @@ interface Context extends Input {
   fileToSend?: File
   peerConnection?: RTCPeerConnection
   dataChannel?: RTCDataChannel
+  /** @deprecated */
   fileSharingState?: {
     metadata: z.infer<typeof fileMetadataSchema>
     transferredBytes: number
   }
+  receiveFileRef?: ActorRefFrom<typeof receiveFileActor>
   request?: Tables<"file_sharing_request">
 }
 
 type Event =
   | PeerConnectionEventsOutputEvents
-  | ReceiveFileOutputEvent
   | SendFileOutputEvent
   | ListenToFileRequestResponseTableOutputEvent
   | { type: "send-file"; file: File }
+  | { type: "receive-file.done" }
   | {
       type: "connection-request-received"
       request: Tables<"file_sharing_request">
     }
   | { type: "accept" }
   | { type: "decline" }
-  | { type: "clear-file-metadata" }
+  | { type: "clear-refs" }
 
 export const connectionMachine = setup({
   types: {
@@ -112,13 +120,16 @@ export const connectionMachine = setup({
     sendResponse: ({ context }, accept: boolean) => {
       sendResponse({ accept, context })
     },
+    clearRefs: assign({
+      receiveFileRef: undefined,
+    }),
   },
   actors: {
     connectCallerPeerMachine,
     connectReceiverPeerMachine,
     sendFile,
     peerConnectionEvents,
-    receiveFile,
+    receiveFile: receiveFileActor,
     listenToFileRequestResponseTable,
     sendRequest: fromPromise<Tables<"file_sharing_request">, Context>(
       async ({
@@ -161,7 +172,7 @@ export const connectionMachine = setup({
       event.response.accepted,
   },
 }).createMachine({
-  /** @xstate-layout N4IgpgJg5mDOIC5QGMD2A7dZkBcCWGAdHhADZgDEsY6EAtAGZ7kDaADALqKgAOqsefBm4gAHogBMAZgkAOQgFYAjAoAsANgDsUzQE5Vq6QBoQAT0SyFbRQtmbNsy7seWAvq5NpM2IemJlKLyxcAnQ6ACcwAEcAVzgcCOwwPAA3SHYuJBA+AV8RcQRpOUUVDW09A2MzRE0JTUIVCQVtKTYNWV1dd08MYN9-cgpkcgBDcMZmMDoAWzAcEYgR+YyRHMFQ-Mk2TVVCdXUpXQddBSkrCRNzBH3rRtUlTXUFZ10pKW6QIJ9Qwi+Q9CgFAgGDAxHQKVQAGtQX8cABhEakcjhAAKYDA4QAsiNkAALPBYFZZNZ5LIFJQPBSECRKWRadSqTS2VQKS6SRyEWQSCS6JT7JQ8qSGBQfWE-ai0AlQAAETEGPHR4V+vW+GFg8xw2FxIwBYCJvH462EZMQDykSkInU6pwF6iUqk6bIQrQkhFUbAObCK9xUUnUopVISIEogUtlkyoNHoctBs3mi2WnFWhtJoHJjN2dvNUi5EkM2nUToe9ROrV00gUB002wD3iDfhDYZjkdoE3IhB44VQUEisFg+uyKY2JoQ9tkFu2bHtTXtZyFTvHbqtznNGkO49rfR+ndQ0x4+AB0pi1HC0pwqGlOOQYH30rFGAoV5vOAHJOHack5fqykrNPH+x5J1agtSteVAuQjjqTdVT8Hc9wPGVjwxM8LyfW973QIFsFIAk9STYkh2ND9CiFdRCDOXk9G2P9TiddQ2CkQgdjtZwmieWl3g8T5A36MVDwAd0EXE70RZEKAVDFCATHFtW8UhX0I9BNmdd15BkD1Oj5BwuSdFkqS9O1aR2HQHlkaD60ISJr1SJsIys5I0jbUFgUJfCDVyd8xFNbQLWXG0JDtB1dCdZ55CZJpxynWQ2F0dQui4jDLKSGzD2bezUimGNCDjBYlhGBSPKIrzRwzPYlGzXN8z9XTFwot4mh2OolHino636dKUlswYOsyyYOy7Hs4H7NzB0KpSRzHCdq2nZRVDnVQnRzXZdA9aRLBkNQlHM-pG0PSJYniIEQTBCFoUIEMACVojidUCqNcbiLzFQGk0Wk2DYZp3QeJ0jkY2KHVkAwVDYOxONarciH4kZ1lS1BT17Ph0GoCgY0SA71USWBEeoO7U2KypLWXBjXgUCQGKdALdlIuaGTNBk5u2n4oZhmUGDh6UEbVShUf2m6Ek5pG9SUTJ3Pu5SCeXFbDjOMmpCAww3T0AVopzWLuUZog0IQjnrsOlzQQJU6YR4n4tbDXn4gQQ3UGQJZQgyXHPIKIUQfIsm4t5LRHAuaoECZXRFG5P1pEah0JHcLj0FQCA4BEDDkzG5S6ELX3k8Id6M8zzOGQ1vwSHIBOxZHGlnk5Q5q3UOQWR2TQgLtPYPvUcdmpZI5c+VNqpULvGCnsAO-yb+iuRkRkKbUTluVimL9GaGL-QSk3gyjLqwG7p3TQ0XZAeYvlyrabYKb0N0PTOWxeW2BmF87og4P3MMkNPc9L2Qa90MXh7RqLx76KpGkQb9TSMVZBAVsIHaQDpKynAAu3PiMpBI4GErbJEGI15FWduUcizgXCxW0KyX21Z5CvBWvoZqU47RmSvhDPwHUV6oI-umKw1JDAgwCs0JkTIQpck5AKQw-J6JegoeDGC51l57V1uqOhykAofWpEof+Hs5HOB+pWQODopwnA+rFeeQiLLM21mzeGcBsarwIonEchggJnDdAoSBAVd5N0Edxa+fgzZiPRjgSRI5zR0nIloAw5Y5CzUsfpIOHFLCyBzBQ9wQA */
+  /** @xstate-layout N4IgpgJg5mDOIC5QGMD2A7dZkBcCWGAdHhADZgDEsY6EAtAGZ7kDaADALqKgAOqsefBm4gAHogBMAZgkAOQgFYAjAoAsANgDsUzQE5Vq6QBoQAT0SyFbRQtmbNsy7seWAvq5NpM2IemJlKLyxcAnQ6ACcwAEcAVzgcCOwwPAA3SHYuJBA+AV8RcQRpOUUVDW09A2MzRE0JTUIVCQVtKTYNWV1dd08MYN9-cgpkcgBDcMSGWAyRHMFQ-MkpVSlCVWcFZt02WSUlE3MEDYVCTQ0lZyb1ZVkpbpAgn1DCB5D0KAoIDDBidBTUAGtvi8cABhEakcjhAAKYDA4QAsiNkAALPBYaZZWZ5LIFXaaY4SJSyLTqVT42SqBT7SSOQiyCQSXRKdTqJSMpZNO7Ap7UWhoqAAAiYgx4sPCz16jwwsBwIxw2GRIzeYAxvH4c2EOMQSm0SkInU6CikbNZa101IQrQkqzY6itMlUuyN6i5kpCRF5EH5QuYlE9jF9hAAtmBZRA5SNVdl1djQLiyapCKzjVJ6RJDNp1BadfVdEa2LppAo7Zo2JpXd53X5Pd7hX6aPQ64QeOFUFBIrAppwZjH5lqEEpVDtCGW2IOmoOpEbVBbh2bOjdB3bnEoK30ni3UEGePg3gKYtRwgKcKgBUjkGAdwLuRgKOfLzgo1i+3HJIX6spi4SdizGRbanqxZMkBci6LU5YePcbr9Ju267oKB5wsep73leN7oB82CkGiKrdpivaaq+hRLOohBTkyehlt+RoWuobArKcrIXMW1y3JB6ESpW8ECgA7oIyLXuCkIUKKcKEOGsookqWCkE+BHoAslqqNsZESLanTMg49IWpSxxsBIrJEqcOg6rIa5Sn4kQXqkta+hQVnJGkAbkOJXxybkL5iIgbAWmw5lVoQNZ7pEsTxB8Xw-H8gKBQ2ABK0RxDK7kagp-bpioDSaESbBsM0yk6haYErLopLOAYKjbNo-n9DxIxzHuDCoEeHZ8Og1AUHWiShTKiSwK11DJbGXkIJU+oGlsUi6FOalSBaBmJiRyykjqUikss1VPLV9WCo1zVwP1lCdSFiUJC10oqkomRqh5hHDaN40TVNCgzf+hirHobKyPRHTqAyG1EKh3HHWFnxYJFAJAtBTyA96wMyggaJ-MgcqhBkg2eQUSwqTI6lMlojgSP+Ci6IoDKrdIpzpoW7iQegqAQHAIjoT2N2pURdBDhadB2KpjLnJYBZyDo-1+CQ5AsylimEsTdKTaWv0Unlmj-qySa5eoOznJSYEi5x65vBLQ0FPYJPfhrdH0g6yvVIUah0gyJUFvozQFi67FQx6Da2eL+Gs4pS6JhSjHMkorTKdbBx1CTyl2hsHRKGW63u1xG6tnB3qIUeJ5nsgF5oR7bPRn7aV0QSCc3OoGkFrIRPyM90hrCxq2-br3J7nxOACcjEJwobGOIDoOhkc4LgldoVI26W8hTVs+jnGOrJmcn65EA5NkNb6fe3fGViEOlk3bKmJXFhatjWsoY6KxsY5-cvFkxXywUJfEW+FwUBm5Xv5erVXziFcWpM1hjjzLlEqbsegpyIFtbiu0BRnTamAV+ilDD-inKsDYVwDIhw1kvCBK8-Awyft1HASD+zGmJGRLQBhCxyGUDOSeaD9LSCJKmWwqYl7uCAA */
   id: "connection",
 
   initial: "idle",
@@ -186,6 +197,7 @@ export const connectionMachine = setup({
                 mimeType: event.file.type,
               }),
             },
+            { type: "clearRefs" },
           ],
         },
 
@@ -199,8 +211,8 @@ export const connectionMachine = setup({
           ],
         },
 
-        "clear-file-metadata": {
-          actions: "clearFileMetadataFromContext",
+        "clear-refs": {
+          actions: ["clearFileMetadataFromContext", "clearRefs"],
         },
       },
     },
@@ -317,35 +329,33 @@ export const connectionMachine = setup({
     },
 
     "receiving file": {
-      invoke: {
-        src: "receiveFile",
-        id: "receiveFile",
+      entry: assign({
+        receiveFileRef: ({ spawn, context, self }) => {
+          const ref = spawn("receiveFile", {
+            id: "receiveFile",
+            input: {
+              dataChannel: context.dataChannel!,
+            },
+          })
 
-        input: ({ context }) => ({
-          dataChannel: context.dataChannel!,
-        }),
-      },
+          ref.subscribe(({ status }) => {
+            if (status === "done") {
+              self.send({ type: "receive-file.done" })
+            }
+          })
+
+          return ref
+        },
+      }),
 
       on: {
         "receive-file.done": {
           target: "idle",
           actions: "closePeerConnection",
         },
-
-        "receive-file.metadata": {
-          actions: {
-            type: "setFileMetadataToContext",
-            params: ({ event }) => event.metadata,
-          },
-        },
-
-        "receive-file.progress": {
-          actions: {
-            type: "updateTransferredBytes",
-            params: ({ event }) => event.receivedBytes,
-          },
-        },
       },
+
+      exit: stopChild("receiveFile"),
     },
 
     "sending request": {
