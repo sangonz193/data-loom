@@ -17,7 +17,6 @@ import {
   listenToFileRequestResponseTable,
 } from "../file-sharing-requests/listen-to-file-request-response-table"
 import { requestPayloadSchema } from "../file-sharing-requests/payload"
-import { getIceServers } from "../ice-candidates"
 import {
   PeerConnectionEventsOutputEvents,
   peerConnectionEvents,
@@ -71,9 +70,7 @@ export const connectionMachine = setup({
   },
   actions: {
     createPeerConnection: enqueueActions(({ enqueue }) => {
-      const peerConnection = new RTCPeerConnection({
-        iceServers: getIceServers(),
-      })
+      const peerConnection = new RTCPeerConnection()
       enqueue.assign({ peerConnection })
 
       enqueue.spawnChild("peerConnectionEvents", {

@@ -3,6 +3,8 @@ import { InvokeCallback } from "xstate/dist/declarations/src/actors/callback"
 
 import { logger } from "@/logger"
 
+const TIMEOUT_AFTER_ICE_GATHERING_COMPLETE_IN_SECONDS = 15000
+
 type Input = {
   peerConnection: RTCPeerConnection
 } & (
@@ -25,6 +27,10 @@ export type ConnectPeerInputEvent =
       candidate: RTCIceCandidate
     }
 
+export type ConnectPeerError = {
+  type: "unknown"
+}
+
 export type ConnectPeerOutputEvent =
   | {
       type: "peer-connection.description"
@@ -39,6 +45,7 @@ export type ConnectPeerOutputEvent =
     }
   | {
       type: "peer-connection.failed"
+      error: ConnectPeerError
     }
 
 const invoke: InvokeCallback<
@@ -50,27 +57,24 @@ const invoke: InvokeCallback<
   let dummyDataChannel: RTCDataChannel | undefined
   let pendingIceCandidates: RTCIceCandidate[] = []
 
-  const eventHandlers: {
-    [K in keyof RTCPeerConnectionEventMap]: [
-      K,
-      (event: RTCPeerConnectionEventMap[K]) => void,
-    ]
-  }[keyof RTCPeerConnectionEventMap][] = []
+  const cleanupFunctions: (() => void)[] = []
 
   function registerEventHandler<K extends keyof RTCPeerConnectionEventMap>(
     type: K,
     handler: (event: RTCPeerConnectionEventMap[K]) => void,
   ) {
     peerConnection.addEventListener(type, handler)
-    eventHandlers.push([type, handler as any])
+    cleanupFunctions.push(() =>
+      peerConnection.removeEventListener(type, handler as any),
+    )
   }
 
   async function eventHandler(event: ConnectPeerInputEvent) {
     switch (event.type) {
       case "description-received": {
         if (peerConnection.remoteDescription) {
-          console.warn(
-            "Received description when remote description already exists. Ignoring.",
+          logger.warn(
+            "[connect-peer] Received description, but remote description already set. Ignoring.",
           )
           return
         }
@@ -131,21 +135,45 @@ const invoke: InvokeCallback<
     })
   })
 
+  let abortTimeout: NodeJS.Timeout | undefined
   registerEventHandler("connectionstatechange", () => {
+    clearTimeout(abortTimeout)
+
     if (peerConnection.connectionState === "connected") {
       sendBack({ type: "peer-connection.successful" })
       logger.info("[connect-peer] Connection successful")
       dummyDataChannel?.close()
-    } else if (peerConnection.connectionState === "failed") {
-      sendBack({ type: "peer-connection.failed" })
+    }
+
+    if (peerConnection.connectionState === "failed") {
+      sendBack({ type: "peer-connection.failed", error: { type: "unknown" } })
       logger.info("[connect-peer] Connection failed")
     }
+  })
+
+  registerEventHandler("icegatheringstatechange", () => {
+    if (peerConnection.iceGatheringState !== "complete") {
+      clearTimeout(abortTimeout)
+      return
+    }
+
+    abortTimeout = setTimeout(() => {
+      sendBack({ type: "peer-connection.failed", error: { type: "unknown" } })
+      logger.info("[connect-peer] Connection failed")
+    }, TIMEOUT_AFTER_ICE_GATHERING_COMPLETE_IN_SECONDS)
+
+    cleanupFunctions.push(() => clearTimeout(abortTimeout))
+  })
+  registerEventHandler("iceconnectionstatechange", () => {
+    if (peerConnection.iceConnectionState !== "failed") return
+
+    sendBack({ type: "peer-connection.failed", error: { type: "unknown" } })
+    logger.info("[connect-peer] Connection failed")
   })
 
   if (calling) {
     dummyDataChannel = peerConnection.createDataChannel("test")
     logger.info("[connect-peer] Created dummy data channel")
-    console.log("dummyDataChannel", dummyDataChannel)
     peerConnection.setLocalDescription().then(() => {
       logger.info("[connect-peer] Local description set")
       sendBack({
@@ -156,9 +184,7 @@ const invoke: InvokeCallback<
   }
 
   return () => {
-    for (const [type, handler] of eventHandlers) {
-      peerConnection.removeEventListener(type, handler as any)
-    }
+    cleanupFunctions.forEach((fn) => fn())
   }
 }
 

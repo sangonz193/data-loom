@@ -5,9 +5,14 @@ import { logger } from "@/logger"
 import { Database, Tables } from "@/supabase/types"
 
 import { createPairingCode, redeemPairingCode } from "./actions"
-import { connectCallerPeerMachine } from "../connect-caller-peer"
-import { connectReceiverPeerMachine } from "../connect-receiver-peer"
-import { getIceServers } from "../ice-candidates"
+import {
+  CallerOutputEvent,
+  connectCallerPeerMachine,
+} from "../connect-caller-peer"
+import {
+  ReceiverOutputEvent,
+  connectReceiverPeerMachine,
+} from "../connect-receiver-peer"
 
 type Input = {
   supabase: SupabaseClient<Database>
@@ -19,9 +24,15 @@ interface Context extends Input {
   redeemCode?: string
   remoteUserId?: string
   peerConnection?: RTCPeerConnection
+  connectionErrorEvent?: Extract<
+    ReceiverOutputEvent,
+    { type: "peer-connection.failed" }
+  >
 }
 
 type Event =
+  | CallerOutputEvent
+  | ReceiverOutputEvent
   | {
       type: "create-code"
     }
@@ -55,13 +66,14 @@ export const newConnectionMachine = setup({
       redeemCode: (_, redeemCode: string) => redeemCode,
     }),
     createPeer: assign({
-      peerConnection: () =>
-        new RTCPeerConnection({
-          iceServers: getIceServers(),
-        }),
+      peerConnection: () => new RTCPeerConnection(),
     }),
     saveRemoteUserIdToContext: assign({
       remoteUserId: (_, remoteUserId: string) => remoteUserId,
+    }),
+    setConnectionErrorEvent: assign({
+      connectionErrorEvent: (_, event: Context["connectionErrorEvent"]) =>
+        event,
     }),
   },
 
@@ -93,12 +105,12 @@ export const newConnectionMachine = setup({
         )
         .subscribe((status, err) => {
           logger.info(
-            "[home] Listening to pairing code redemption status:",
+            "[new-connection] Listening to pairing code redemption status:",
             status,
           )
           if (err)
             logger.error(
-              "[home] Error listening to pairing code redemption",
+              "[new-connection] Error listening to pairing code redemption",
               err,
             )
         })
@@ -136,7 +148,7 @@ export const newConnectionMachine = setup({
     }),
   },
 }).createMachine({
-  /** @xstate-layout N4IgpgJg5mDOIC5QDswHcC0BjA9s1WALgJZ4B0xEANmAMRYBOYAhoWNjhGANoAMAuolAAHHLGIk8QkAA9EARgBMAVjLLeG+esUAWAOwAOZQDYdAGhABPRIoCcqlRt57jtg-L2KAzDoC+vi1RMXHwwIlJkCmo6Ji4wAFsOLj5BJBBRcUlkaTkEJVV1TW19I1MLazzFAzVvHR15Yy95XgaDf0D0DlDw8kYWEmQoAAJcLloIPDAKZAA3HABrKaCugiyyPtZiQZHOMAQtuaxNvBSU6QyJCJzEEx0yYz15W3kvRV4vPUMvcps9LzJPj4dI0vI1jO52iBliFVhEyFRiLA2MgtsMAGY4BhDWIJYRZWC0HHxPERDBMLBgYgzSBnNIXLLXPK8VxkZq2HS6XTGeTyAwGH4IFTVPS2cHc2yggy8Aw6ZSQ6F4WG9RVhAbDI5UGgMcaTaZzRbrFVEADCzE1YAYAAUwBaALLMLAACy2PAE5zElykaVyHiMZF4yh0BiFDylDQFdmMAJ0tljPgMovscoCUM6MNVcI2aqGAFdYBadt0sjrUHqFks00a1lnUbn81j0z1kPtZjgjllTm66R6Gd6bF4vLx-RpB8pRT4XnoI6Lo7GJUHE8pkx1glW4TiErXRnQJqWDuWyAqi+vIDb4lvdi3DsdkJ3UiIe1c+wgRbYyK93so+ezFC9zFYFEHf1ag+AMTA8Yxl1TVdj2VY9tnJSlqW1Xcpn3A0jyVSJG2zRCqQtK82xvO93UyJ9QB9LwE39QMZV0AwHnqAUtH+JwR30ZRmneLx-BTZBdngNJMIzL0HzI0TZEQDBjAFaTh00YxjGlZQfFcHi+MrWDIkoGhSM9bJnw5ZivzIepFMgpoqj0PwNJgrD1iYTZtm3PTewoxBQXkVlHgMQw+UMDwpwAwVPDIXQ52ed5PgMLwoOEpt4URZFawxLEiRJPBBLE-TGVfd83li78OT-CNQvCudmg+L44s0+ycK3M0tVc8jJLyKi3wDIMOSDRj5AjYxFFnWNFBcDRfxquyROwqtIGaiTchUT4yATZxIKXDl1CCiotGqMzFPeAbJUg+Vaqmhz+lrPMC3qiT6RahbmSHZwYs49QeSaUrBvK2NKui2KTsmhKN3PZzdjmgz3IQZQ-mW9kv1eeoGkURRmKqUyIrh7kwIBlYzvqhCwiQi1wcZZoWTZbquR5PlUd2jHZSxpdeN8IA */
+  /** @xstate-layout N4IgpgJg5mDOIC5QDswHcC0BjA9s1WALgJZ4B0xEANmAMRYBOYAhoWNjhGANoAMAuolAAHHLGIk8QkAA9EARgBMAVjLLeG3gBZ5u5QA5FATi0AaEAE9EAZmXW1RgGzKA7PsePrW5T4C+v81RMXHwwIlJkCmo6Ji4wAFsOLj5BJBBRcUlkaTkEJVV1TR09QxNzKzzHeTIXQsNeeWtefSMDf0D0DlDw8kYWEmQoAAJcLloIPDAKZAA3HABrKaCugiyyPtZiQZHOMAQtuaxNvBSU6QyJCJzEZUctMkcXeSNeT2d9fTdym2tFMiVNEZDMYtLZrO0QMsQqsImQqMRYGxkFthgAzHAMIaxBLCLKwWjY+K4iIYJhYMDEGaQM5pC5Za55V73eS8EyKFweZTs-RmSw2eQuf6g7y8Yz6eQfR4QqF4GG9WVhAbDI5UGgMcaTaZzRbrBVEADCzFVYAYAAUwCaALLMLAACy2PAE5zElykaVyAtZZFZ1ncWkUGhZt2+CGsLj+ykaimFtScWhc0s60MVsOT4W2KrVtGEFoYKxT5FRzGINAgNJELvp7oULi9Pr9AYavGDfIQ7L+3msz0M8lcWnFieCerWGyVQwArrATTtulkNagtQslknh6mmJttpPp2msvtZjgjllTk7aZWrtW2+zqkYxZGtM3eByQ2GI1GY8o4wmApCV7PYdiEhRHYxgmBcDiXMgZT-cgAPiIDRj2cDDwiY9UgrTJz1AD0mX+Vl-Q5ZxuV5Cp5C0IwahcLx9GsGigXkO5B3zHpIh3ICyQpKl1VAqZwJ1KC5RY1dtnYykTT3Q5jmQVDnQwt0sJrOsjF9O5GyDRwQyUfQ1E0MNH3UJpakY1j5T-YSwg4k1s1zJi1iLEtqRPdDXWyC9PXI+sVMDZt1NbAVHG9TRPlaWiDEUfxv2QXZ4DSfiCxcpyq3khAMB8ioMFUIxMqy7KsvcIzV3ISgaBk5yGX9Z94weFw6I-bRFEefR8uglj1zHBCSsS2QbCqf4nhee9PDI+rnyaBxnC0MjqJ0VkmoEuEESRID0UxQliTwaKEswrqEGq8jfm0ZpmmsRxXhG3gxuUCagS8FkjFmuLdVM5UjTVDqto9Lt7HrLQPCcVxlGfRRqlZZxPscfRH19e7mMe1ZIDeuTtpUZ4yHqdQIdearrGfRwIz+m9eGsTL2UJ6GR1aoCt0xYz4vSM9EdyRs-g0NxKPjXGORcCqtIaLsAxcMilN+ZQyf-SALTgjNdgR2nckMewqho4xHBMDwvl8nrww8Z5fho+Nm1FkyYTM8lRIYGWGUaZwyB+46wycLx6uIhRNfqqolMUPXaxFiLfzmmmhhNBgMXh09ZNlxAmYC1mvA5dlHhDRRPm9RpSI+fQuQaLRwt8IA */
   id: "new-connection",
 
   initial: "idle",
@@ -210,6 +222,16 @@ export const newConnectionMachine = setup({
           target: "creating user connection",
         },
       },
+
+      on: {
+        "peer-connection.failed": {
+          target: "connection errored",
+          actions: {
+            type: "setConnectionErrorEvent",
+            params: ({ event }) => event,
+          },
+        },
+      },
     },
 
     connected: {
@@ -251,6 +273,20 @@ export const newConnectionMachine = setup({
           remoteUserId: context.remoteUserId!,
         }),
       },
+
+      on: {
+        "peer-connection.failed": {
+          target: "connection errored",
+          actions: {
+            type: "setConnectionErrorEvent",
+            params: ({ event }) => event,
+          },
+        },
+      },
+    },
+
+    "connection errored": {
+      type: "final",
     },
   },
 })
