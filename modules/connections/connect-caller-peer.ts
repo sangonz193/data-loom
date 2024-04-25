@@ -1,5 +1,5 @@
 import { SupabaseClient, User } from "@supabase/supabase-js"
-import { assign, sendTo, setup } from "xstate"
+import { assign, sendTo, setup, sendParent } from "xstate"
 
 import { logger } from "@/logger"
 import { Database, Json } from "@/supabase/types"
@@ -27,6 +27,11 @@ type Context = Input & {
 }
 
 type Event = WebRtcSignalsOutputEvent | ConnectPeerOutputEvent
+
+export type CallerOutputEvent = Extract<
+  ConnectPeerOutputEvent,
+  { type: "peer-connection.failed" }
+>
 
 export const connectCallerPeerMachine = setup({
   types: {
@@ -260,6 +265,10 @@ export const connectCallerPeerMachine = setup({
         type: "savePendingIceCandidate",
         params: ({ event }) => event.candidate,
       },
+    },
+
+    "peer-connection.failed": {
+      actions: sendParent(({ event }) => event satisfies CallerOutputEvent),
     },
   },
 })

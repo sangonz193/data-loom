@@ -1,5 +1,5 @@
 import { SupabaseClient, User } from "@supabase/supabase-js"
-import { assign, sendTo, setup } from "xstate"
+import { assign, sendParent, sendTo, setup } from "xstate"
 
 import { logger } from "@/logger"
 import { Database, Json } from "@/supabase/types"
@@ -25,6 +25,11 @@ type Context = Input & {
 }
 
 type Event = WebRtcSignalsOutputEvent | ConnectPeerOutputEvent
+
+export type ReceiverOutputEvent = Extract<
+  ConnectPeerOutputEvent,
+  { type: "peer-connection.failed" }
+>
 
 export const connectReceiverPeerMachine = setup({
   types: {
@@ -188,6 +193,10 @@ export const connectReceiverPeerMachine = setup({
         type: "setAnswerToContext",
         params: ({ event }) => event.description,
       },
+    },
+
+    "peer-connection.failed": {
+      actions: sendParent(({ event }) => event satisfies ReceiverOutputEvent),
     },
   },
 })

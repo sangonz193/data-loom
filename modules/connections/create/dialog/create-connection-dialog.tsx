@@ -15,6 +15,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { useRequiredUser } from "@/modules/auth/use-user"
 import { createClient } from "@/utils/supabase/client"
 
+import { ConnectionErrored } from "./connection-errored"
 import { DisplayCode } from "./display-code"
 import { Idle } from "./idle"
 import { Success } from "./success"
@@ -78,6 +79,8 @@ function Content() {
           createdAt={createdCode.created_at}
         />
       )}
+
+      {state.value === "connection errored" && <ConnectionErrored />}
     </>
   )
 }
