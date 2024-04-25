@@ -3,7 +3,7 @@ import { InvokeCallback } from "xstate/dist/declarations/src/actors/callback"
 
 import { logger } from "@/logger"
 
-const TIMEOUT_AFTER_ICE_GATHERING_COMPLETE = 5000
+const TIMEOUT_AFTER_ICE_GATHERING_COMPLETE_IN_SECONDS = 15000
 
 type Input = {
   peerConnection: RTCPeerConnection
@@ -73,8 +73,8 @@ const invoke: InvokeCallback<
     switch (event.type) {
       case "description-received": {
         if (peerConnection.remoteDescription) {
-          console.warn(
-            "Received description when remote description already exists. Ignoring.",
+          logger.warn(
+            "[connect-peer] Received description, but remote description already set. Ignoring.",
           )
           return
         }
@@ -128,7 +128,6 @@ const invoke: InvokeCallback<
 
   registerEventHandler("icecandidate", (event) => {
     if (!event.candidate) return
-    alert(JSON.stringify(event.candidate, null, 2))
 
     sendBack({
       type: "peer-connection.ice-candidate",
@@ -136,16 +135,22 @@ const invoke: InvokeCallback<
     })
   })
 
+  let abortTimeout: NodeJS.Timeout | undefined
   registerEventHandler("connectionstatechange", () => {
-    console.log("***", peerConnection.connectionState)
+    clearTimeout(abortTimeout)
+
     if (peerConnection.connectionState === "connected") {
       sendBack({ type: "peer-connection.successful" })
       logger.info("[connect-peer] Connection successful")
       dummyDataChannel?.close()
     }
+
+    if (peerConnection.connectionState === "failed") {
+      sendBack({ type: "peer-connection.failed", error: { type: "unknown" } })
+      logger.info("[connect-peer] Connection failed")
+    }
   })
 
-  let abortTimeout: NodeJS.Timeout | undefined
   registerEventHandler("icegatheringstatechange", () => {
     if (peerConnection.iceGatheringState !== "complete") {
       clearTimeout(abortTimeout)
@@ -155,12 +160,11 @@ const invoke: InvokeCallback<
     abortTimeout = setTimeout(() => {
       sendBack({ type: "peer-connection.failed", error: { type: "unknown" } })
       logger.info("[connect-peer] Connection failed")
-    }, TIMEOUT_AFTER_ICE_GATHERING_COMPLETE)
+    }, TIMEOUT_AFTER_ICE_GATHERING_COMPLETE_IN_SECONDS)
 
     cleanupFunctions.push(() => clearTimeout(abortTimeout))
   })
   registerEventHandler("iceconnectionstatechange", () => {
-    console.log("***", peerConnection.iceConnectionState)
     if (peerConnection.iceConnectionState !== "failed") return
 
     sendBack({ type: "peer-connection.failed", error: { type: "unknown" } })

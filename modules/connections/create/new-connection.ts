@@ -105,12 +105,12 @@ export const newConnectionMachine = setup({
         )
         .subscribe((status, err) => {
           logger.info(
-            "[home] Listening to pairing code redemption status:",
+            "[new-connection] Listening to pairing code redemption status:",
             status,
           )
           if (err)
             logger.error(
-              "[home] Error listening to pairing code redemption",
+              "[new-connection] Error listening to pairing code redemption",
               err,
             )
         })
