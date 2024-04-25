@@ -10,6 +10,7 @@ import {
 } from "xstate"
 import { z } from "zod"
 
+import { logger } from "@/logger"
 import { Tables } from "@/supabase/types"
 import { createClient } from "@/utils/supabase/client"
 
@@ -34,20 +35,21 @@ type Input = {
 }
 
 interface Context extends Input {
-  fileToSend?: File
+  filesToSend?: File[]
   peerConnection?: RTCPeerConnection
-  dataChannel?: RTCDataChannel
-  receiveFileRef?: ActorRefFrom<typeof receiveFileActor>
-  sendFileRef?: ActorRefFrom<typeof sendFileActor>
+  dataChannels?: RTCDataChannel[]
+  receiveFileRefs?: ActorRefFrom<typeof receiveFileActor>[]
+  sendFileRefs?: ActorRefFrom<typeof sendFileActor>[]
   request?: Tables<"file_sharing_request">
 }
 
 type Event =
   | PeerConnectionEventsOutputEvents
   | ListenToFileRequestResponseTableOutputEvent
-  | { type: "send-file"; file: File }
+  | { type: "send-files"; files: File[] }
   | { type: "receive-file.done" }
   | { type: "send-file.done" }
+  | { type: "send-more" }
   | {
       type: "connection-request-received"
       request: Tables<"file_sharing_request">
@@ -65,8 +67,6 @@ export const connectionMachine = setup({
       peerConnectionEvents: "peerConnectionEvents"
       connectCallerPeerMachine: "connectCallerPeerMachine"
       connectReceiverPeerMachine: "connectReceiverPeerMachine"
-      sendFile: "sendFile"
-      receiveFile: "receiveFile"
       listenToFileRequestResponseTable: "listenToFileRequestResponseTable"
     },
   },
@@ -82,14 +82,18 @@ export const connectionMachine = setup({
         },
       })
     }),
-    setFileToContext: assign({
-      fileToSend: (_, file: File) => file,
+    setFilesToContext: assign({
+      filesToSend: (_, files: File[]) => files,
     }),
     setDataChannelToContext: assign({
-      dataChannel: (_, channel: RTCDataChannel) => channel,
+      dataChannels: (
+        { context: { dataChannels } },
+        channel: RTCDataChannel,
+      ) => [...(dataChannels ?? []), channel],
     }),
     closePeerConnection: enqueueActions(({ enqueue, context }) => {
       enqueue.stopChild("peerConnectionEvents")
+      logger.info("[connectionMachine] Closing peer connection")
       context.peerConnection?.close()
       enqueue.assign({ peerConnection: undefined })
     }),
@@ -100,16 +104,18 @@ export const connectionMachine = setup({
       sendResponse({ accept, context })
     },
     clearRefs: assign({
-      receiveFileRef: undefined,
-      sendFileRef: undefined,
-      fileToSend: undefined,
+      receiveFileRefs: undefined,
+      sendFileRefs: undefined,
+      filesToSend: undefined,
     }),
-    spawnReceiveFile: assign({
-      receiveFileRef: ({ spawn, context, self }) => {
+    spawnNextReceiveFile: assign({
+      receiveFileRefs: ({ spawn, context, self }) => {
+        const nextIndex = context.receiveFileRefs?.length ?? 0
+        const dataChannel = context.dataChannels![nextIndex]
+
         const ref = spawn("receiveFile", {
-          id: "receiveFile",
           input: {
-            dataChannel: context.dataChannel!,
+            dataChannel,
           },
         })
 
@@ -119,16 +125,18 @@ export const connectionMachine = setup({
           }
         })
 
-        return ref
+        return [...(context.receiveFileRefs || []), ref]
       },
     }),
-    spawnSendFile: assign({
-      sendFileRef: ({ spawn, context, self }) => {
+    spawnNextSendFile: assign({
+      sendFileRefs: ({ spawn, context, self }) => {
+        const nextIndex = context.sendFileRefs?.length ?? 0
+        const nextFile = context.filesToSend![nextIndex]
         const ref = spawn("sendFile", {
-          id: "sendFile",
           input: {
-            file: context.fileToSend!,
+            file: nextFile,
             peerConnection: context.peerConnection!,
+            index: nextIndex,
           },
         })
 
@@ -138,11 +146,24 @@ export const connectionMachine = setup({
           }
         })
 
-        return ref
+        return [...(context.sendFileRefs || []), ref]
       },
     }),
-    stopReceiveFile: stopChild("receiveFile"),
-    stopSendFile: stopChild("sendFile"),
+    stopReceiveFile: ({ context }) => {
+      const latestRef =
+        context.receiveFileRefs?.[context.receiveFileRefs.length - 1]
+      if (latestRef) stopChild(latestRef)
+    },
+    stopSendFile: ({ context }) => {
+      const latestRef = context.sendFileRefs?.[context.sendFileRefs.length - 1]
+      if (latestRef) stopChild(latestRef)
+    },
+    closeDataChannel: ({ context }) => {
+      const latestChannel =
+        context.dataChannels?.[context.dataChannels.length - 1]
+
+      latestChannel?.close()
+    },
   },
   actors: {
     connectCallerPeerMachine,
@@ -153,9 +174,9 @@ export const connectionMachine = setup({
     listenToFileRequestResponseTable,
     sendRequest: fromPromise<Tables<"file_sharing_request">, Context>(
       async ({
-        input: { supabase, remoteUserId, currentUser, fileToSend },
+        input: { supabase, remoteUserId, currentUser, filesToSend },
       }) => {
-        if (!fileToSend) throw new Error("File to send is not defined")
+        if (!filesToSend) throw new Error("`filesToSend` is not defined")
 
         const { data, error } = await supabase
           .from("file_sharing_request")
@@ -163,11 +184,11 @@ export const connectionMachine = setup({
             from_user_id: currentUser.id,
             to_user_id: remoteUserId,
             payload: {
-              file: {
+              files: filesToSend!.map((fileToSend) => ({
                 name: fileToSend.name,
                 size: fileToSend.size,
                 mimeType: fileToSend.type,
-              },
+              })),
             } satisfies z.input<typeof requestPayloadSchema>,
           })
           .select()
@@ -187,7 +208,7 @@ export const connectionMachine = setup({
   },
   guards: {
     isFileDataChannel: (_, dataChannel: RTCDataChannel) =>
-      dataChannel.label === "file",
+      dataChannel.label.startsWith("file:"),
     accepted: (_, event: ListenToFileRequestResponseTableOutputEvent) =>
       event.response.accepted,
     peerConnectionIsClosed: ({ context }) =>
@@ -196,9 +217,31 @@ export const connectionMachine = setup({
       context.peerConnection?.connectionState === "disconnected",
     peerConnectionIsFailed: ({ context }) =>
       context.peerConnection?.connectionState === "failed",
+    sentAllFiles: ({ context: { filesToSend, sendFileRefs } }) => {
+      const lastRef = sendFileRefs![sendFileRefs!.length - 1]
+      return (
+        !!lastRef &&
+        !!filesToSend &&
+        sendFileRefs!.length === filesToSend.length &&
+        lastRef.getSnapshot().status === "done"
+      )
+    },
+    receivedAllFiles: ({ context }) => {
+      const { files } = context.request?.payload as z.infer<
+        typeof requestPayloadSchema
+      >
+
+      const result =
+        files.length === context.receiveFileRefs?.length &&
+        context.receiveFileRefs.every(
+          (ref) => ref.getSnapshot().status === "done",
+        )
+
+      return result
+    },
   },
 }).createMachine({
-  /** @xstate-layout N4IgpgJg5mDOIC5QGMD2A7dZkBcCWGAdHhADZgDEsY6EAtAGZ7kDaADALqKgAOqsefBm4gAHogBMARgBsbQmxkSZAVgkqAHAHYNATkUAaEAE9EKgCwbC5xeoC+do2kzYh6YmUrOsuAujoATmAAjgCucDiB2GB4AG6Q7FxIIHwCbiLiCNJyCkqq6tp6hiaI5ipShLoqAMxS9o4g3q5+HuQUyOQAhgFRDLCJIqmCfhmSbNXyZdUSWlqaOvoyRqYI1VoV5lqqSioOThg+boRNvuhQFBAYYMTosagA1tcnOADCnaTkAQAKYGABALKdZAACzwWAGySG6WSmSkUjmhGkGg05ikKjUWmq5nMy0QcJUhF2DWeLWotDBUAABEw2jxfgFjgdmhhYDhOjhsMDOmcwBDePxhsIYXiZLotIQFlIUSotOM6ipcQg4eY9o0mb4iDwAqgALY8fBnSmhagBSk4VCUoHIMD6ykkjAUK02nB8lIC6GgTIzFS6XIzKTVJQTTaKwPVQkaapR6Mx6qq+3uLW6-UUo0ms0Wp22hMXbCkMG8ziDd0jYVZf2EeG6bSKNgWGTI0Pownx9VHEmGgDugmBdvenwodL+hAg7KBXJcpFdUNLnsQtX0lTW60DEmDWkV0gqsyxayJ+xcGvcQWtcVTNMoJ5i8UYzGul3BRchJaFc6VovFkulstq6kV2IJKQ5XqA9DlJGgIFTIIwgiC4rhuO5HkIMkIAAJRCcJWWnF90FGctzBkCUpV0KMgPrRsSgQdYKjYLRdAbOZW0PI5O06YZDQYVBTSCWA+HQagKAvKIYNZKJeJZQskn5NJZzEUpzHDNglPGOt4RlDQpEVXQaLXBTGOJNsWlY9iqU47i4D4gShOgzDIh4yzeSkKS3Rk185IQbFFOUiZyjmHRNMomQ4UIDRbH3NVmJaLMDSpGzYIfa4wUQp5DKIaKoIwiIECS1BkHZPxEmw1zcLLBd5BI2YAyDNgQ0o6pkQUH09E0WM41VdBUAgOARATYtirwuglkowamLAogSHIPrBRKt8JDrcMVFo+jFsKRZ-y0CRKgkejtHChNGUis4po9dzZl9JENKA6pyhUJRFQ0lsDMiogUPPO9jtk2EynkCRzDXNgqh-eUtKkUbmUTbU9RitM-gzS1kGtbNUpmlzprw37AwlGVdCqORyI0UNtEa6sqkjWMwaPA6wK7Hs+w+P4PrczJrrmhQ0Q0UUpBsHZN2kQhWoF0GnrG49ojPDj3uffqyzRKMQsDOtAeAhVKOyR7QPB5CIIykScEZlGvQUwi-Jx266wIiiVhlAlvWrGV4R3FVhc14zobMyl7Ik-W8L+xVNAqUKdgpo50sNOLWW9sttobSppWRarapWMNCSa0nWocBwgA */
+  /** @xstate-layout N4IgpgJg5mDOIC5QGMD2A7dZkBcCWGAdHhADZgDEsY6EAtAGZ7mwDaADALqKgAOqsPPgw8QAD0QBGAEzSAnIXYAOAKxyAbAGYALJM1ztAdjkAaEAE9EK9esLbt66UumGXrxwF8PZtJmzD0YjJKXyxcAnQ6ACcwAEcAVzgcaOwwPAA3SA5uJBB+QQDRCQQZfUVVDR09A2MzSwQXJUI5OU1JFWkHdXZ1e00vHwwwgKDyCmRyAEMolIY2LlF8oQiixGl2bWk7Q16VFXbpdTlDJTqpOSb99WslW+0Lg37vEFD-CMJX8PQoCggMMGI6HSqAA1gDPjgAMKTUjkKIABTAYCiAFlJsgABZ4LDZRYCZYiXLFDpnBAqNqENRGFTGGlOSRKAYvIZvIhMFgAAmo6BwFF4SKiHxZ4QwsBwkxw2Axk2+YFxuSWhSJiB2tiUMn2nXUem0qlJ2nYCh0RmUmkMkkMhk00iZEPevCiqAAtrx8N8OfFqFEOThUBz0cgwK6OXaMBQA0GcPK+PilaBinJpKTHoQzWobL1pDpXLbhSMHc7XdioB6vT6-RHg6H0L9sKRsXKFgrYytlSVZAplOmqvojKYLFJnJSDexZOt7KPPM9q0K-F8SwB3IQYkMwuF8gWECAS9HSvykaN5FuE+NWJMDkonFSp9g0hyWy32XNzkbciDFjkxBJJX7-QHAsFCDfAAlOJEjFQ9FVbU8EGcUlSnYQhnDkQ0jg2dhDWfYZ3gXSZlndBhUG9GJYH4dBqAodkwBSb8xRSUjRUbHIYwKaDxEQGwmnYfQegwjDjm0FR4MkHpCAZFQlH0NQzVkLDWUCXD8JLQjiLgMiKKomjwOSEj1LlSRmKPViT3Y9syi7SpdF7WoL3sa8jkcTNH2cOSRUCSs3RLL9tN-LB-1BcE83eDyP28pIEGxYFkAlCJskg490FWMksyQwwVHYPR9gy60hIvDRDCQjoOnUK0LR0VzXxod8COYOAN2RWdsNFcVJUxGUYHi4zErbNNKQqIwlHNPYjEMUknEuAx1CUFppAOOR2gq943w-KjYCAqqVtqqgqsYWqt3+TqCW6mDeokqkTiGlQRv1Q1U3sQxTXNS1rUMRaiGWmqWHW2hNrGN9dvIfacQMvEuqSyQjGaW9bnYE5kPUUkdmaNpYZ2WGHNuN7AhiQMMl+uBCBxtJ0nxigiYyaiqKBpjQaO8HOiadUs1aSQjnuWQxtvLYsyulxNBsQSsyxwnUjxz6CfJknxbJ0XMgBgE-mBwyoJM4ojkkSkeN0PpuPPepJETDWLiuzYLVHfntGFyX8bWxTPI5FSOSwMQcAdrb+Qa7dxTa-dDrjUz1c1lDte0TRdfg5xr3JLNJANrtDCMYXVs-WXIHqwVqzFCUpXamnmzBts4IvVnNGvJxZAwnQlFh5QvGedBUAgOBRGrWn-eKOhtFJOgLkUKb5tRmRRz0YWSHINu2OKWPZE1mRpuD7jejGlpmgcloIZsTVLenIKiDtb4J9VxAWiNfYJLDpRHF1PWpFjzRCE6GlLUOCSxyT2rYC5GgcEP46A4cSk7QprT0GocU4tlbpKHuo9C0VobQ7xfPaR0Lp7aemROWf0yBAxVl3n-FWf8p5n0ICcae5ddSDTGhDRQJ9rSV37lA4W+9FzLlXLCZEv8kquHvsYfu7QNhh1aMmTQ99VDSHJAnW8U1MYIKaoED6XkwJJA4W2CGeg7CCTaGlPQUCZCkhpAoeeI4LSsyuq9GR8lCB2xWkRFODFyJgGUTBFwWxuIoT2LDLMs1JDwVQoQGwnQRKlwer0YWIV3RhTFI40yYcjazVAVA9Kxou55VDqmIqGx2is21MLeRbsWBROKPYbuIlKS8LNPNUO1xa7mLct9aqykP51PxgU4+N8GhaGoQ4Aw5IjCHDMYMRBRBrbi3gPnOmPUOmw3VGac0pdJLJP1laLi1prS9EkpaQaVtZY2xFrjKWDTx5jPbogXQGspl6EtJleZEcyh6E0INDK6xbidC2XsnZViCI2Odq7KiLSSijkQtqc0ygxGw1fhHGk1DZAaNDhDHY79OSS0gH89o6piHVxaDoPYPMEbF16CI64ElgXrBpHXDwQA */
   id: "connection",
 
   initial: "idle",
@@ -210,12 +253,12 @@ export const connectionMachine = setup({
   states: {
     idle: {
       on: {
-        "send-file": {
+        "send-files": {
           target: "sending request",
 
           actions: [
             { type: "clearRefs" },
-            { type: "setFileToContext", params: ({ event }) => event.file },
+            { type: "setFilesToContext", params: ({ event }) => event.files },
           ],
         },
 
@@ -246,36 +289,12 @@ export const connectionMachine = setup({
         }),
 
         onDone: {
-          target: "sending file",
+          target: "sending files",
         },
       },
     },
 
-    "sending file": {
-      entry: {
-        type: "spawnSendFile",
-      },
-
-      on: {
-        "send-file.done": {
-          target: "file-sent",
-        },
-        "peer.connectionstatechange": {
-          target: "idle",
-          guard: or([
-            "peerConnectionIsFailed",
-            "peerConnectionIsClosed",
-            "peerConnectionIsDisconnected",
-          ]),
-        },
-      },
-
-      exit: {
-        type: "stopSendFile",
-      },
-    },
-
-    "file-sent": {
+    "files sent": {
       on: {
         "peer.connectionstatechange": {
           target: "idle",
@@ -319,7 +338,7 @@ export const connectionMachine = setup({
 
       on: {
         "peer.datachannel": {
-          target: "receiving file",
+          target: "receiving files",
 
           actions: {
             type: "setDataChannelToContext",
@@ -331,23 +350,6 @@ export const connectionMachine = setup({
             params: ({ event }) => event.event.channel,
           },
         },
-      },
-    },
-
-    "receiving file": {
-      entry: {
-        type: "spawnReceiveFile",
-      },
-
-      on: {
-        "receive-file.done": {
-          target: "idle",
-          actions: "closePeerConnection",
-        },
-      },
-
-      exit: {
-        type: "stopReceiveFile",
       },
     },
 
@@ -398,6 +400,97 @@ export const connectionMachine = setup({
         src: "sendResponse",
         onDone: "connecting with caller",
         input: ({ context }) => ({ context, accept: true }),
+      },
+    },
+
+    "sending files": {
+      states: {
+        "sending file": {
+          exit: "stopSendFile",
+
+          entry: { type: "spawnNextSendFile" },
+          on: {
+            "send-file.done": [
+              {
+                target: "#connection.files sent",
+                guard: "sentAllFiles",
+              },
+              { target: "sending file", reenter: true },
+            ],
+          },
+        },
+      },
+
+      initial: "sending file",
+
+      on: {
+        "peer.connectionstatechange": {
+          target: "idle",
+
+          guard: or([
+            "peerConnectionIsFailed",
+            "peerConnectionIsClosed",
+            "peerConnectionIsDisconnected",
+          ]),
+        },
+      },
+    },
+
+    "receiving files": {
+      states: {
+        "receiving file": {
+          on: {
+            "receive-file.done": [
+              {
+                target: "#connection.files received",
+                actions: ["closeDataChannel", "closePeerConnection"],
+                guard: "receivedAllFiles",
+              },
+              {
+                target: "waiting for next file",
+                actions: "closeDataChannel",
+                reenter: true,
+              },
+            ],
+          },
+
+          entry: "spawnNextReceiveFile",
+          exit: "stopReceiveFile",
+        },
+
+        "waiting for next file": {
+          on: {
+            "peer.datachannel": {
+              target: "receiving file",
+
+              actions: {
+                type: "setDataChannelToContext",
+                params: ({ event }) => event.event.channel,
+              },
+
+              guard: {
+                type: "isFileDataChannel",
+                params: ({ event }) => event.event.channel,
+              },
+            },
+          },
+        },
+      },
+
+      initial: "receiving file",
+    },
+
+    "files received": {
+      on: {
+        "peer.connectionstatechange": {
+          target: "idle",
+
+          guard: or([
+            "peerConnectionIsFailed",
+            "peerConnectionIsClosed",
+            "peerConnectionIsDisconnected",
+          ]),
+        },
       },
     },
   },

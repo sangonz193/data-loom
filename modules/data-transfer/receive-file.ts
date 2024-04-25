@@ -36,6 +36,7 @@ export const receiveFileActor = setup({
 
   actions: {
     setDataChannelListeners: ({ self, context }) => {
+      logger.info("[receive-file] Setting data channel listener")
       context.dataChannel.onmessage = (event) => {
         self.send({ type: "datachannel.data", data: event.data })
       }
@@ -74,6 +75,7 @@ export const receiveFileActor = setup({
       chunks: ({ context: { chunks } }) => chunks.slice(1),
     }),
     closeWriter: ({ context }) => {
+      logger.info("[receive-file] Closing writer")
       context.writer!.close()
     },
   },
@@ -81,6 +83,7 @@ export const receiveFileActor = setup({
   actors: {
     initializeWriter: fromPromise<FileSystemWritableFileStream, Context>(
       async ({ input: { metadata } }) => {
+        logger.info("[receive-file] Initializing writer")
         const fileHandle = await showSaveFilePicker({
           suggestedName: metadata!.name,
           _preferPolyfill: true,
@@ -103,7 +106,9 @@ export const receiveFileActor = setup({
       return context.receivedBytes >= context.metadata!.size
     },
     isMetadataSet: ({ context }) => {
-      return !!context.metadata
+      const result = !!context.metadata
+
+      return result
     },
     chunkToWrite: ({ context }) => {
       return context.chunks.length > 0
@@ -118,7 +123,7 @@ export const receiveFileActor = setup({
     },
   },
 }).createMachine({
-  /** @xstate-layout N4IgpgJg5mDOIC5QCcwGMwEsBuYC0AZpgDZgB0A7gIaYAumAdlAAQED2yzAtmLVRFT4BiAXzQALKgwZhiZUVQDaABgC6iUAAc2sOpjYMNIAB6IArAEYAzGTMAmKwBYAbAHYrVs44CcdswBoQAE9EAA4LMis7O28La2czVzNvZQsAXzTA1AwcfCJSShp6JlYObl5+QSohFXUkEG1degMjUwRXaLJnP2UrOOTvK2dHQJCEC1CbZ1Do9ytXR0dQ70cMrPQsXEIScmzNxhZ8sBEqiSkZOQVao0a9Fvq2u2dnMiTu7sdlZa8R4MRPVxkCzObwJbrKOyhZSuVxrEB7XLbAoI7AHVg7SjIOhgZBkRh0EQGciMbBsADWuw2iKOZBRaJpFCxtBxeIYdAQJLYaEE+gYtWu9VuzUMD3+w0ijnmQwmymhE2cozCjjMr18lm8oTMyT6cJReQxdJKDKZLMwEFINTUNx0dxFoDa8xejjsrmhfWcFh8CV+YzcKtlrmGrgmWuWzl1VK2NMNhwxjOxuLNFsUFjqWhtwtaiA6di6PT6FgGQx92eSXTiyyWcSGkwjOSjBsj9LjJtx8eKUEJMlZpIptMj+uRTaNLYTmL0TA5DFJ3OF-KtgozvKzCGLEqlHqhctCCr+7TsykikNSlk1EJ3GUyIAYbAgcCMeqRYGtTWXotXioQeBV3l-v+VXzOFEPiwlej4MkU9JlDwfAKC+tormYvRkMqkzPMkSHeGYQyfhMETJIGwIDLKoShHWmyDpS9bNqQ8GZu+lifkhh7Sq4GoWHYIZWOR1KNtRI4FO2OJ0W+9qIL+TGhIC0yODmCTzJxdg8Q2Q78bGgmtqydAifcYnjLJn4zBEygATuHGfIM3jKZR-ZqeiGljkmz6Lq+ukmOYZihGQoIek4IImb0u5jEkgL2B0VhQp4pFsdZT62fsAnkEJbZMgcOl2u54yJHmXr2Mo-5SQEe7BiqHTOMowwhtCnmxTSEBEulK4rDYHguE8XwmfMn5vGQx5eL4HTNekl5AA */
+  /** @xstate-layout N4IgpgJg5mDOIC5QCcwGMwEsBuYC0AZpgDZgB0A7gIaYAumAdlAAQED2yzAtmLVRFT4BiAXzQALKgwZhiZUVQDaABgC6iUAAc2sOpjYMNIAB6IArAEYAzGTMAmKwBYAbAHYrVs44CcdswBoQAE9EAA4LMis7O28La2czVzNvZQsAXzTA1AwcfCJSShp6JlYObl5+QSohFXUkEG1degMjUwRXBLJvZ2VHD28rVzsLZWdAkIQY5zJQ1Lc7ZRTnWbMMrPQsXEIScmzNxhZ8sBEqiSkZOQVao0a9Fvq2u2dppOcnu0dlUO8vR3HETyuMgWZzdMxvZR2WauVxrEB7XLbAoI7AHVg7SjIOhgZBkRh0EQGciMbBsADWuw2iKOZBRaJpFCxtBxeIYdAQJLYaEE+gYtWu9VuzUMDwBzkckT67mcFlmylcsrGwTCjjMZFcvks3lCZmSVnSmXhVK2NLpJQZTJZmAgpBqahuOjuItAbUG00cdlc8v1Mp8CT+yoQbjVynl4oVOrM32ccJReQxZsOGMZ2Nx1ttigsdS0juFrUQrlmXSivR+Fliqqs-wQ32UXSSMVDTyi31jxvjyON9OTltxKeKUEJMlZpIptPbSMpOVR5p7qcxeiYHIYpO5wv59sFud5+YQVnFksG+9loYjSomQzrLdSlh1kNCMbhDDYEDgRjjk4dTR3or31bw0wWDCXzhJYjgWAsAxttOHbkNQi6HGUPB8AoX5OruHwRFCPyhB4FiJFEhbVsMV4LBqoQOMoVipCC0GbLB47Tt2pBoXmv6WNWZihmQp7JJ6ThJB4j7rDBk6Mfss4FP2OKsT+LqIN43icaEQJcUkuE3qEHoGiJ9FiYm6JSb2rJ0LJ9zyQgFiOK41YUREvRcQ+EGfAM3h0dSCZdpJcHGemYBmc6JjmFGXTPNYLgpJ8+7Vkkqmeg4syeKEKluYaH6ml5SZGfO-YHAFu74UCbx+vYizeI4KkBIGCpqkMPTirKalRu5JoYhARL5b+5U2B4LhPF8vSDDF4JkFCyheL4QzdQaGRAA */
   id: "receive-file",
 
   context: ({ input }) => ({
@@ -134,11 +139,6 @@ export const receiveFileActor = setup({
     "waiting for metadata": {
       entry: "setDataChannelListeners",
 
-      always: {
-        target: "receiving file",
-        guard: "isMetadataSet",
-      },
-
       on: {
         "datachannel.data": {
           actions: {
@@ -146,6 +146,11 @@ export const receiveFileActor = setup({
             params: ({ event }) => event.data,
           },
         },
+      },
+
+      always: {
+        target: "receiving file",
+        guard: "isMetadataSet",
       },
     },
 
@@ -156,6 +161,7 @@ export const receiveFileActor = setup({
             init: {
               invoke: {
                 src: "initializeWriter",
+                id: "initialize-writer",
                 input: ({ context }) => context,
                 onDone: {
                   target: "idle",
@@ -207,7 +213,6 @@ export const receiveFileActor = setup({
 
       on: {
         "datachannel.data": {
-          target: "receiving file",
           actions: [
             {
               type: "addChunk",

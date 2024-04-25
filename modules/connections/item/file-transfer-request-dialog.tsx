@@ -1,4 +1,5 @@
 import { filesize } from "filesize"
+import { useMemo } from "react"
 import { Actor, StateFrom } from "xstate"
 import { z } from "zod"
 
@@ -29,7 +30,26 @@ type Props = {
 export function FileTransferRequestDialog({ send, state, remoteUser }: Props) {
   const { request } = state.context
   const metadata = (request?.payload as z.infer<typeof requestPayloadSchema>)
-    .file
+    .files
+
+  const description = useMemo(() => {
+    let description = `${getUserName({
+      colorLabel: remoteUser?.colors?.label,
+      animalLabel: remoteUser?.animals?.label,
+    })} is sending you`
+
+    const totalSize = metadata.reduce((acc, file) => acc + file.size, 0)
+
+    if (metadata.length !== 1) {
+      description += ` ${metadata.length} files`
+    } else {
+      description += ` "${metadata[0].name}"`
+    }
+
+    description += ` (${filesize(totalSize)}). Do you want to accept it?`
+
+    return description
+  }, [metadata, remoteUser?.animals?.label, remoteUser?.colors?.label])
 
   return (
     <AlertDialog open>
@@ -42,14 +62,7 @@ export function FileTransferRequestDialog({ send, state, remoteUser }: Props) {
               animalLabel: remoteUser?.animals?.label,
             })}
           </AlertDialogTitle>
-          <AlertDialogDescription>
-            {getUserName({
-              colorLabel: remoteUser?.colors?.label,
-              animalLabel: remoteUser?.animals?.label,
-            })}{" "}
-            is sending you {`"${metadata.name}"`}{" "}
-            {`(${filesize(metadata.size || 0)})`}. Do you want to accept it?
-          </AlertDialogDescription>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={() => send({ type: "decline" })}>

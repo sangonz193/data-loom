@@ -10,6 +10,7 @@ const CHUNK_SIZE = 1024 * 50
 type Input = {
   peerConnection: RTCPeerConnection
   file: File
+  index: number
 }
 
 type Event =
@@ -21,6 +22,7 @@ type Event =
       chunk: ArrayBuffer
     }
   | { type: "bufferedamountlow" }
+  | { type: "datachannel.close" }
 
 interface Context extends Input {
   dataChannel: RTCDataChannel
@@ -38,8 +40,9 @@ export const sendFileActor = setup({
 
   actions: {
     createDataChannel: assign({
-      dataChannel: ({ context: { peerConnection, file }, self }) => {
-        const dataChannel = peerConnection.createDataChannel("file")
+      dataChannel: ({ context: { peerConnection, file, index }, self }) => {
+        logger.info("[send-file] Creating data channel")
+        const dataChannel = peerConnection.createDataChannel("file:" + index)
         dataChannel.binaryType = "arraybuffer"
         dataChannel.bufferedAmountLowThreshold = CHUNK_SIZE * 5
 
@@ -71,8 +74,9 @@ export const sendFileActor = setup({
           logger.info("[send-file] read chunk", chunk.byteLength)
 
           if (self.getSnapshot().value !== "reading chunk") {
-            console.error("Unexpected chunk read", self.getSnapshot().value)
+            logger.error("Unexpected chunk read", self.getSnapshot().value)
           }
+
           self.send({ type: "chunk-read", chunk })
         }
 
@@ -109,7 +113,7 @@ export const sendFileActor = setup({
   },
 
   actors: {
-    closeFile: fromCallback<{ type: "noop" }, Context>(
+    closeDataChannel: fromCallback<{ type: "noop" }, Context>(
       ({ input: { dataChannel } }) => {
         return () => {
           logger.info("[send-file] closing dataChannel")
@@ -126,11 +130,10 @@ export const sendFileActor = setup({
       readerCursor < file.size,
   },
 }).createMachine({
-  /** @xstate-layout N4IgpgJg5mDOIC5SzAOwgWgGYEsA2YAdDqjgC4DEATmAIaYDGAFgK6oDWA2gAwC6ioAA4B7WORzDUAkAA9EANgAcAFkIBmAEyKAjAE553DQFZuu7ooA0IAJ6I15who3yjitfOVGN27RuUBffysUdGx8Ihp6EigAAmY2dgp4jgxIiB5+JBARMTIJKSy5BAB2DV1CRXlS7mUfRXrdZStbBF9FQhNuLu1uNXddDV7A4LRMXAJCEIhouNYOCgzpHPFJaSKNYuKK4pNjV10jeUG1ZsRleXlHZyMvC9digYCgkCmwiamZ5MTObUyhURWBVA602212N0UByOvVOCAu5WKvW0-TUymKPV0wxeozeRA+qFiXwWGj+2QBeVWhUQGy2ih2hghUOOsIM5QOajaRl8tTUmOer3GRAA7rRxASYlhhFQYgAjFhYLBgKgUOUKpWQWgAW2EbDIeGEQsWWWWFKBsgUKnUWj0BmMpnMsNcqlKLguBm48ncikCz1QwggcGkAvCS3J+TWiAw8lhUaxwYmJHIody4apCGUvMI6NMul55nqXlhGw0VxcRl0xTuxR0ajjOMFhDSnzm7GTgIjCDM3EIaIuPi6hl0ig0RYrjkrhyMOz6KmcddCDfxhJbbdNHeUI5siG0aJ711cvIrFzU3v59fChBFYtikulqsVVFXqeBZ1Kjinuh6Gf2ZRZDmObRKDu1baPOYwXhAkhgE+lIvumyjOhiuZmPUiiFlucIXFmSLeEONxVMUPr+EAA */
   id: "send-file",
 
   invoke: {
-    src: "closeFile",
+    src: "closeDataChannel",
     input: ({ context }) => context,
   },
 
@@ -174,7 +177,6 @@ export const sendFileActor = setup({
           ],
 
           target: "sending chunk",
-          reenter: true,
         },
       },
     },
@@ -197,7 +199,7 @@ export const sendFileActor = setup({
           guard: and(["moreToRead", "bufferHasSpace"]),
         },
         {
-          target: "done",
+          target: "#send-file.waiting for datachannel to close",
           guard: not("moreToRead"),
         },
         {
@@ -214,6 +216,17 @@ export const sendFileActor = setup({
             logger.info("[send-file] bufferedamountlow")
           },
         },
+      },
+    },
+
+    "waiting for datachannel to close": {
+      entry: ({ context, self }) => {
+        context.dataChannel.onclose = () => {
+          self.send({ type: "datachannel.close" })
+        }
+      },
+      on: {
+        "datachannel.close": "done",
       },
     },
 

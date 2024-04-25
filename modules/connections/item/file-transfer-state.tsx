@@ -1,143 +1,105 @@
 import { useSelector } from "@xstate/react"
 import { filesize } from "filesize"
-import { CheckCircleIcon, FileIcon, XIcon } from "lucide-react"
-import { Actor } from "xstate"
+import { CheckCircleIcon, FileIcon } from "lucide-react"
+import { ActorRefFrom } from "xstate"
+import { z } from "zod"
 
-import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/cn"
-
-import { connectionMachine } from "./machine"
+import {
+  fileMetadataSchema,
+  receiveFileActor,
+} from "@/modules/data-transfer/receive-file"
+import { sendFileActor } from "@/modules/data-transfer/send-file"
 
 type Props = {
-  actor: Actor<typeof connectionMachine>
-  send: Actor<typeof connectionMachine>["send"]
+  file: z.infer<typeof fileMetadataSchema> | File
+  sendActorRef: ActorRefFrom<typeof sendFileActor> | undefined
+  receiveActorRef: ActorRefFrom<typeof receiveFileActor> | undefined
 }
 
-export function FileTransferState({ actor, send }: Props) {
-  const state = useSelector(actor, (state) => {
+export function FileTransferState({
+  file,
+  sendActorRef,
+  receiveActorRef,
+}: Props) {
+  const { fileName, fileSize } = getFileNameAndSize(file)
+
+  const receiveFileState = useSelector(receiveActorRef, (state) => {
+    if (!state) return undefined
+    const {
+      context: { receivedBytes, writtenBytes },
+      status,
+    } = state
+
     return {
-      value: state.value,
-      receiveFileRef: state.context.receiveFileRef,
-      sendFileRef: state.context.sendFileRef,
-      canClearRefs: state.can({ type: "clear-refs" }),
-      fileToSend: state.context.fileToSend,
+      status,
+      receivedBytes,
+      writtenBytes,
     }
   })
 
-  let data:
-    | {
-        fileName: string
-        fileSize: number
-        transferredBytes: number
-      }
-    | undefined = undefined
-
-  const receiveFileState = useSelector(state.receiveFileRef, (state) => {
-    const context = state?.context
-    if (!context?.metadata) return undefined
+  const sendFileState = useSelector(sendActorRef, (state) => {
+    if (!state) return undefined
+    const {
+      context: { readerCursor },
+      status,
+      value,
+    } = state
 
     return {
-      value: state?.value,
-      fileName: context.metadata.name ?? "",
-      fileSize: context.metadata.size ?? 0,
-      receivedBytes: context.receivedBytes,
-      writtenBytes: context.writtenBytes,
+      status,
+      value,
+      readerCursor,
     }
   })
-
-  const sendFileState = useSelector(state.sendFileRef, (state) => {
-    const context = state?.context
-    if (!context?.file) return undefined
-
-    return {
-      value: state?.value,
-      fileName: context.file.name ?? "",
-      fileSize: context.file.size ?? 0,
-      readerCursor: context.readerCursor,
-    }
-  })
-
-  if (receiveFileState) {
-    data = {
-      ...receiveFileState,
-      transferredBytes: receiveFileState.receivedBytes,
-    }
-  } else if (sendFileState) {
-    data = {
-      fileName: sendFileState.fileName,
-      fileSize: sendFileState.fileSize,
-      transferredBytes: sendFileState.readerCursor,
-    }
-  } else if (state.fileToSend) {
-    data = {
-      fileName: state.fileToSend.name,
-      fileSize: state.fileToSend.size,
-      transferredBytes: 0,
-    }
-  }
 
   const done =
-    sendFileState?.value === "done" || receiveFileState?.value === "done"
+    sendFileState?.status === "done" || receiveFileState?.status === "done"
+
+  const transferring = (!!sendActorRef || !!receiveActorRef) && !done
+  const transferredBytes =
+    sendFileState?.readerCursor ?? receiveFileState?.receivedBytes ?? 0
   const Icon = done ? CheckCircleIcon : FileIcon
 
   return (
     <div
       className={cn(
         "relative gap-1 overflow-hidden rounded-md border",
-        (state.value === "sending request" ||
-          state.value === "waiting for response") &&
-          "animate-pulse",
+        !sendActorRef && !receiveActorRef && "animate-pulse",
       )}
     >
       <div className="relative flex-row items-center gap-2 py-1 pl-3 pr-1">
         <div className="min-h-10 shrink grow flex-row items-center gap-2">
           <Icon className={cn("size-5", done && "text-green-500/50")} />
-          <span className="shrink truncate" title={data?.fileName}>
-            {data?.fileName}
+          <span className="shrink truncate" title={fileName}>
+            {fileName}
           </span>
         </div>
-
-        {state.canClearRefs && (
-          <Button
-            onClick={() => send({ type: "clear-refs" })}
-            size="icon"
-            variant="ghost"
-          >
-            <XIcon />
-          </Button>
-        )}
       </div>
 
-      {!done && (
+      {transferring && (
         <>
           <div className="relative mx-3 h-2 overflow-hidden rounded-full bg-muted">
             <div
               className="absolute bottom-0 left-0 top-0 rounded-full bg-green-500/80 transition-[width]"
               style={{
-                width: `${data ? getProgressPercentage(data.transferredBytes, data.fileSize) : 0}%`,
+                width: `${transferring ? getProgressPercentage(transferredBytes, fileSize) : 0}%`,
               }}
             />
             {!!receiveFileState?.writtenBytes && (
               <div
                 className="absolute bottom-0 left-0 top-0 rounded-full bg-green-500/50 transition-[width]"
                 style={{
-                  width: `${data ? getProgressPercentage(receiveFileState.writtenBytes, data.fileSize) : 0}%`,
+                  width: `${transferring ? getProgressPercentage(receiveFileState.writtenBytes, fileSize) : 0}%`,
                 }}
               />
             )}
           </div>
 
           <div className="flex-row justify-between px-3 pb-2">
-            <span className="text-xs">
-              {state.value === "waiting for response" &&
-                "Waiting for confirmation..."}
-              {(state.value === "sending file" ||
-                state.value === "receiving file") &&
-                data &&
-                filesize(data?.transferredBytes)}
-            </span>
+            <span className="text-xs">{filesize(transferredBytes)}</span>
 
-            <span className="text-xs">{data && filesize(data.fileSize)}</span>
+            <span className="text-xs">{filesize(fileSize)}</span>
           </div>
         </>
       )}
@@ -150,4 +112,18 @@ function getProgressPercentage(
   totalBytes: number,
 ): number {
   return (transferredBytes / totalBytes) * 100
+}
+
+function getFileNameAndSize(file: Props["file"]) {
+  if (file instanceof File) {
+    return {
+      fileName: file.name,
+      fileSize: file.size,
+    }
+  }
+
+  return {
+    fileName: file.name,
+    fileSize: file.size,
+  }
 }

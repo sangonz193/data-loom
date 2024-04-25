@@ -9,7 +9,7 @@ import { themeClassNames } from "@/styles/themeClasses"
 import { createClient } from "@/utils/supabase/client"
 
 import { FileTransferRequestDialog } from "./file-transfer-request-dialog"
-import { FileTransferState } from "./file-transfer-state"
+import { FilesList } from "./files-list"
 import { connectionMachine } from "./machine"
 import { Button } from "../../../components/ui/button"
 import { useRequiredUser } from "../../auth/use-user"
@@ -45,10 +45,7 @@ export function Connection({ connection }: Props) {
     noKeyboard: true,
     noDrag: state.value !== "idle",
     onDrop: (files) => {
-      const file = files[0]
-      if (file) {
-        send({ type: "send-file", file })
-      }
+      if (files.length) send({ type: "send-files", files })
     },
   })
 
@@ -114,8 +111,8 @@ export function Connection({ connection }: Props) {
             </span>
           )}
 
-          {(state.value === "sending file" ||
-            state.value === "receiving file") && (
+          {(state.matches("sending files") ||
+            state.matches("receiving files")) && (
             <span className="text-green-500/50">Connected</span>
           )}
         </div>
@@ -136,19 +133,15 @@ export function Connection({ connection }: Props) {
         )}
       </div>
 
-      {(state.context.receiveFileRef ||
-        state.context.sendFileRef ||
-        state.context.fileToSend) && (
-        <FileTransferState actor={actor} send={send} />
-      )}
+      <FilesList actor={actor} />
 
       <div className="flex-row-reverse gap-3">
         <DeleteConnection connection={connection} />
 
-        {state.can({ type: "send-file" }) && (
+        {state.can({ type: "send-files" }) && (
           <Button variant="ghost" onClick={() => inputRef.current?.click()}>
             <SendIcon className="size-5" />
-            Send File
+            Send Files
           </Button>
         )}
       </div>
