@@ -1,6 +1,8 @@
 import { fromCallback } from "xstate"
 import { InvokeCallback } from "xstate/dist/declarations/src/actors/callback"
 
+import { logger } from "@/logger"
+
 type Input = {
   peerConnection: RTCPeerConnection
 }
@@ -37,12 +39,17 @@ const callback: InvokeCallback<
     eventHandlers.push([type, handler as any])
   }
 
-  registerEventHandler("datachannel", (event) =>
-    sendBack({ type: "peer.datachannel", event }),
-  )
-  registerEventHandler("connectionstatechange", (event) =>
-    sendBack({ type: "peer.connectionstatechange", event }),
-  )
+  registerEventHandler("datachannel", (event) => {
+    logger.info("[peer-connection-events] datachannel", event.channel)
+    sendBack({ type: "peer.datachannel", event })
+  })
+  registerEventHandler("connectionstatechange", (event) => {
+    logger.info(
+      "[peer-connection-events] connectionstatechange",
+      peerConnection.connectionState,
+    )
+    sendBack({ type: "peer.connectionstatechange", event })
+  })
 
   return () => {
     eventHandlers.forEach(([type, handler]) => {

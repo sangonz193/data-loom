@@ -23,8 +23,8 @@ export function Connections() {
 
         {!!data?.length && (
           <span className="text-sm text-muted-foreground">
-            To send a file, click the {'"'}Send File{'"'} button in a connection
-            or drag and drop a file onto a connection.
+            To send files, click the {'"'}Send Files{'"'} button in a connection
+            or drag and drop the files onto a connection.
           </span>
         )}
 

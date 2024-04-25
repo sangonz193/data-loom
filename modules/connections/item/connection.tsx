@@ -9,7 +9,7 @@ import { themeClassNames } from "@/styles/themeClasses"
 import { createClient } from "@/utils/supabase/client"
 
 import { FileTransferRequestDialog } from "./file-transfer-request-dialog"
-import { FileTransferState } from "./file-transfer-state"
+import { FilesList } from "./files-list"
 import { connectionMachine } from "./machine"
 import { Button } from "../../../components/ui/button"
 import { useRequiredUser } from "../../auth/use-user"
@@ -28,26 +28,24 @@ export function Connection({ connection }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
   const user = useRequiredUser()
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    noClick: true,
-    noKeyboard: true,
-    onDrop: (files) => {
-      const file = files[0]
-      if (file) {
-        send({ type: "send-file", file })
-      }
-    },
-  })
 
   const remoteUserNumber = user.id === connection.user_1_id ? 2 : 1
   const remoteUser = connection[`user_${remoteUserNumber}`]
   const remoteUserId = connection[`user_${remoteUserNumber}_id`]
 
-  const [state, send] = useMachine(connectionMachine, {
+  const [state, send, actor] = useMachine(connectionMachine, {
     input: {
       supabase,
       currentUser: user,
       remoteUserId,
+    },
+  })
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    noClick: true,
+    noKeyboard: true,
+    noDrag: state.value !== "idle",
+    onDrop: (files) => {
+      if (files.length) send({ type: "send-files", files })
     },
   })
 
@@ -77,7 +75,7 @@ export function Connection({ connection }: Props) {
   return (
     <div
       className={cn(
-        "relative gap-3 rounded-lg border border-primary/50 bg-card p-4",
+        "relative gap-3 overflow-hidden rounded-lg border border-primary/50 bg-card p-4",
         themeClassNames[
           (remoteUser?.color_id as keyof typeof themeClassNames) || "default"
         ],
@@ -113,8 +111,8 @@ export function Connection({ connection }: Props) {
             </span>
           )}
 
-          {(state.value === "sending file" ||
-            state.value === "receiving file") && (
+          {(state.matches("sending files") ||
+            state.matches("receiving files")) && (
             <span className="text-green-500/50">Connected</span>
           )}
         </div>
@@ -135,21 +133,15 @@ export function Connection({ connection }: Props) {
         )}
       </div>
 
-      {state.context.fileSharingState && (
-        <FileTransferState
-          state={state}
-          fileSharingState={state.context.fileSharingState}
-          send={send}
-        />
-      )}
+      <FilesList actor={actor} />
 
       <div className="flex-row-reverse gap-3">
         <DeleteConnection connection={connection} />
 
-        {state.can({ type: "send-file" }) && (
+        {state.can({ type: "send-files" }) && (
           <Button variant="ghost" onClick={() => inputRef.current?.click()}>
             <SendIcon className="size-5" />
-            Send File
+            Send Files
           </Button>
         )}
       </div>
