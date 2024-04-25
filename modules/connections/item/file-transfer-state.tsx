@@ -71,7 +71,7 @@ export function FileTransferState({
       <div className="relative flex-row items-center gap-2 py-1 pl-3 pr-1">
         <div className="min-h-10 shrink grow flex-row items-center gap-2">
           <Icon className={cn("size-5", done && "text-green-500/50")} />
-          <span className="shrink truncate" title={fileName}>
+          <span className="shrink truncate text-sm" title={fileName}>
             {fileName}
           </span>
         </div>

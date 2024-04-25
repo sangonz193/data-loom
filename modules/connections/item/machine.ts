@@ -56,7 +56,7 @@ type Event =
     }
   | { type: "accept" }
   | { type: "decline" }
-  | { type: "clear-refs" }
+  | { type: "clear-last-transfer" }
 
 export const connectionMachine = setup({
   types: {
@@ -103,10 +103,11 @@ export const connectionMachine = setup({
     sendResponse: ({ context }, accept: boolean) => {
       sendResponse({ accept, context })
     },
-    clearRefs: assign({
+    clearLastTransfer: assign({
       receiveFileRefs: undefined,
       sendFileRefs: undefined,
       filesToSend: undefined,
+      request: undefined,
     }),
     spawnNextReceiveFile: assign({
       receiveFileRefs: ({ spawn, context, self }) => {
@@ -257,7 +258,7 @@ export const connectionMachine = setup({
           target: "sending request",
 
           actions: [
-            { type: "clearRefs" },
+            { type: "clearLastTransfer" },
             { type: "setFilesToContext", params: ({ event }) => event.files },
           ],
         },
@@ -272,8 +273,8 @@ export const connectionMachine = setup({
           ],
         },
 
-        "clear-refs": {
-          actions: "clearRefs",
+        "clear-last-transfer": {
+          actions: "clearLastTransfer",
         },
       },
     },
@@ -442,7 +443,7 @@ export const connectionMachine = setup({
           on: {
             "receive-file.done": [
               {
-                target: "#connection.files received",
+                target: "#connection.idle",
                 actions: ["closeDataChannel", "closePeerConnection"],
                 guard: "receivedAllFiles",
               },
@@ -478,20 +479,6 @@ export const connectionMachine = setup({
       },
 
       initial: "receiving file",
-    },
-
-    "files received": {
-      on: {
-        "peer.connectionstatechange": {
-          target: "idle",
-
-          guard: or([
-            "peerConnectionIsFailed",
-            "peerConnectionIsClosed",
-            "peerConnectionIsDisconnected",
-          ]),
-        },
-      },
     },
   },
 })

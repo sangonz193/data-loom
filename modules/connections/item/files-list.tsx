@@ -1,6 +1,9 @@
 import { useSelector } from "@xstate/react"
+import { TrashIcon } from "lucide-react"
 import { ActorRefFrom } from "xstate"
 import { z } from "zod"
+
+import { Button } from "@/components/ui/button"
 
 import { FileTransferState } from "./file-transfer-state"
 import { connectionMachine } from "./machine"
@@ -21,6 +24,9 @@ export function FilesList({ actor }: Props) {
       receiveFileRefs,
       sendFileRefs,
       request,
+      showClear:
+        state.can({ type: "clear-last-transfer" }) &&
+        (!!state.context.request || !!state.context.filesToSend),
     }
   })
 
@@ -31,7 +37,7 @@ export function FilesList({ actor }: Props) {
     (state.request?.payload as z.infer<typeof requestPayloadSchema>).files
 
   return (
-    <div className="gap-2">
+    <div className="gap-2 rounded-md border p-2">
       {files.map((file, index) => {
         const sendActorRef = state.sendFileRefs?.[index]
         const receiveActorRef = state.receiveFileRefs?.[index]
@@ -45,6 +51,17 @@ export function FilesList({ actor }: Props) {
           />
         )
       })}
+
+      {state.showClear && (
+        <Button
+          onClick={() => actor.send({ type: "clear-last-transfer" })}
+          className="ml-auto"
+          variant="link"
+        >
+          <TrashIcon className="size-4" />
+          Clear
+        </Button>
+      )}
     </div>
   )
 }
