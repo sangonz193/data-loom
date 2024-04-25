@@ -102,6 +102,7 @@ export const connectionMachine = setup({
     clearRefs: assign({
       receiveFileRef: undefined,
       sendFileRef: undefined,
+      fileToSend: undefined,
     }),
     spawnReceiveFile: assign({
       receiveFileRef: ({ spawn, context, self }) => {
@@ -213,8 +214,8 @@ export const connectionMachine = setup({
           target: "sending request",
 
           actions: [
-            { type: "setFileToContext", params: ({ event }) => event.file },
             { type: "clearRefs" },
+            { type: "setFileToContext", params: ({ event }) => event.file },
           ],
         },
 

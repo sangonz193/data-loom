@@ -136,7 +136,9 @@ export function Connection({ connection }: Props) {
         )}
       </div>
 
-      {(state.context.receiveFileRef || state.context.sendFileRef) && (
+      {(state.context.receiveFileRef ||
+        state.context.sendFileRef ||
+        state.context.fileToSend) && (
         <FileTransferState actor={actor} send={send} />
       )}
 
