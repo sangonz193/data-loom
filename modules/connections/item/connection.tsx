@@ -28,16 +28,6 @@ export function Connection({ connection }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
   const user = useRequiredUser()
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    noClick: true,
-    noKeyboard: true,
-    onDrop: (files) => {
-      const file = files[0]
-      if (file) {
-        send({ type: "send-file", file })
-      }
-    },
-  })
 
   const remoteUserNumber = user.id === connection.user_1_id ? 2 : 1
   const remoteUser = connection[`user_${remoteUserNumber}`]
@@ -48,6 +38,17 @@ export function Connection({ connection }: Props) {
       supabase,
       currentUser: user,
       remoteUserId,
+    },
+  })
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    noClick: true,
+    noKeyboard: true,
+    noDrag: state.value !== "idle",
+    onDrop: (files) => {
+      const file = files[0]
+      if (file) {
+        send({ type: "send-file", file })
+      }
     },
   })
 
@@ -77,7 +78,7 @@ export function Connection({ connection }: Props) {
   return (
     <div
       className={cn(
-        "relative gap-3 rounded-lg border border-primary/50 bg-card p-4",
+        "relative gap-3 overflow-hidden rounded-lg border border-primary/50 bg-card p-4",
         themeClassNames[
           (remoteUser?.color_id as keyof typeof themeClassNames) || "default"
         ],
@@ -135,7 +136,7 @@ export function Connection({ connection }: Props) {
         )}
       </div>
 
-      {state.context.fileSharingState && (
+      {(state.context.receiveFileRef || state.context.sendFileRef) && (
         <FileTransferState actor={actor} send={send} />
       )}
 

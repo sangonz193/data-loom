@@ -16,19 +16,6 @@ type Context = Input & {
   writer?: FileSystemWritableFileStream
 }
 
-export type ReceiveFileOutputEvent =
-  | {
-      type: "receive-file.done"
-    }
-  | {
-      type: "receive-file.metadata"
-      metadata: z.infer<typeof fileMetadataSchema>
-    }
-  | {
-      type: "receive-file.progress"
-      receivedBytes: number
-    }
-
 type Event = {
   type: "datachannel.data"
   data: ArrayBuffer | string
@@ -57,7 +44,7 @@ export const receiveFileActor = setup({
       metadata: (_, data: string | ArrayBuffer) => {
         if (typeof data !== "string") return undefined
 
-        console.log("*** setting metadata", data)
+        logger.info("[receive-file] Received metadata", data)
         const metadata = tryGetMetadata(data)
         return metadata
       },
@@ -105,6 +92,7 @@ export const receiveFileActor = setup({
     ),
     writeChunk: fromPromise<void, Context>(
       async ({ input: { chunks, writer } }) => {
+        logger.info("[receive-file] Writing chunk", chunks[0].byteLength)
         await writer!.write(chunks[0])
       },
     ),
@@ -121,6 +109,11 @@ export const receiveFileActor = setup({
       return context.chunks.length > 0
     },
     writeComplete: ({ context }) => {
+      logger.info(
+        "[receive-file] Write complete",
+        context.writtenBytes,
+        context.metadata!.size,
+      )
       return context.writtenBytes >= context.metadata!.size
     },
   },

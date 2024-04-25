@@ -18,8 +18,8 @@ export function FileTransferState({ actor, send }: Props) {
     return {
       value: state.value,
       receiveFileRef: state.context.receiveFileRef,
+      sendFileRef: state.context.sendFileRef,
       canClearRefs: state.can({ type: "clear-refs" }),
-      fileSharingState: state.context.fileSharingState,
     }
   })
 
@@ -43,17 +43,27 @@ export function FileTransferState({ actor, send }: Props) {
     }
   })
 
+  const sendFileState = useSelector(state.sendFileRef, (state) => {
+    const context = state?.context
+    if (!context?.file) return undefined
+
+    return {
+      fileName: context.file.name ?? "",
+      fileSize: context.file.size ?? 0,
+      readerCursor: context.readerCursor,
+    }
+  })
+
   if (receiveFileState) {
     data = {
       ...receiveFileState,
       transferredBytes: receiveFileState.receivedBytes,
     }
-  } else if (state.fileSharingState) {
-    const { fileSharingState } = state
+  } else if (sendFileState) {
     data = {
-      fileName: fileSharingState.metadata.name,
-      fileSize: fileSharingState.metadata.size,
-      transferredBytes: fileSharingState.transferredBytes,
+      fileName: sendFileState.fileName,
+      fileSize: sendFileState.fileSize,
+      transferredBytes: sendFileState.readerCursor,
     }
   }
 

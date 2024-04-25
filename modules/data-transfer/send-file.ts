@@ -1,4 +1,4 @@
-import { fromCallback } from "xstate"
+import { and, assign, fromCallback, not, setup } from "xstate"
 import { z } from "zod"
 
 import { logger } from "@/logger"
@@ -12,77 +12,213 @@ type Input = {
   file: File
 }
 
-export type SendFileOutputEvent =
+type Event =
   | {
-      type: "send-file.metadata"
-      metadata: z.infer<typeof fileMetadataSchema>
+      type: "read-chunk"
     }
   | {
-      type: "send-file.progress"
-      sentBytes: number
+      type: "chunk-read"
+      chunk: ArrayBuffer
     }
+  | { type: "bufferedamountlow" }
 
-export const sendFile = fromCallback<{ type: "noop" }, Input>((params) => {
-  const sendBack = params.sendBack as (event: SendFileOutputEvent) => void
-  const { peerConnection, file } = params.input
+interface Context extends Input {
+  dataChannel: RTCDataChannel
+  readerCursor: number
+  fileReader: FileReader
+  lastChunk?: ArrayBuffer
+}
 
-  logger.info("[send-file] creating dataChannel")
-  const dataChannel = peerConnection.createDataChannel("file")
-  dataChannel.binaryType = "arraybuffer"
-  dataChannel.bufferedAmountLowThreshold = CHUNK_SIZE * 5
+export const sendFileActor = setup({
+  types: {
+    input: {} as Input,
+    context: {} as Context,
+    events: {} as Event,
+  },
 
-  logger.info("[send-file] creating fileReader")
-  const fileReader = new FileReader()
-  let cursor = 0
-  function readChunk() {
-    logger.info(`[send-file] reading chunk at ${cursor} / ${file.size}`)
-    fileReader.readAsArrayBuffer(file.slice(cursor, cursor + CHUNK_SIZE))
-  }
+  actions: {
+    createDataChannel: assign({
+      dataChannel: ({ context: { peerConnection, file }, self }) => {
+        const dataChannel = peerConnection.createDataChannel("file")
+        dataChannel.binaryType = "arraybuffer"
+        dataChannel.bufferedAmountLowThreshold = CHUNK_SIZE * 5
 
-  fileReader.onload = (e) => {
-    logger.info(`[send-file] loaded chunk at ${cursor} / ${file.size}`)
-    cursor += CHUNK_SIZE
-    const chunk = e.target?.result as ArrayBuffer
+        dataChannel.onopen = () => {
+          logger.info("[send-file] dataChannel.onopen")
+          const metadata: z.infer<typeof fileMetadataSchema> = {
+            name: file.name,
+            size: file.size,
+            mimeType: file.type,
+          }
+          logger.info("[send-file] sending metadata", metadata)
+          dataChannel.send(JSON.stringify(metadata))
+          self.send({ type: "read-chunk" })
+        }
 
-    logger.info(
-      `[send-file] sending chunk ${Math.min(cursor, file.size)} / ${file.size}`,
-    )
-    dataChannel.send(chunk)
-    sendBack({ type: "send-file.progress", sentBytes: cursor })
+        dataChannel.onbufferedamountlow = () => {
+          self.send({ type: "bufferedamountlow" })
+        }
 
-    if (cursor >= file.size) {
-      return
-    } else if (
-      dataChannel.bufferedAmount <= dataChannel.bufferedAmountLowThreshold
-    ) {
-      readChunk()
-    }
-  }
+        return dataChannel
+      },
+    }),
 
-  dataChannel.onopen = () => {
-    logger.info("[send-file] dataChannel.onopen")
-    const metadata: z.infer<typeof fileMetadataSchema> = {
-      name: file.name,
-      size: file.size,
-      mimeType: file.type,
-    }
-    logger.info("[send-file] sending metadata", metadata)
-    dataChannel.send(JSON.stringify(metadata))
-    sendBack({ type: "send-file.metadata", metadata })
-    readChunk()
-  }
+    createFileReader: assign({
+      fileReader: ({ self }) => {
+        const fileReader = new FileReader()
+        fileReader.onload = (event) => {
+          const chunk = event.target!.result as ArrayBuffer
+          logger.info("[send-file] read chunk", chunk.byteLength)
 
-  if (dataChannel.readyState === "open") {
-    dataChannel.onopen(null as any)
-  }
+          if (self.getSnapshot().value !== "reading chunk") {
+            console.error("Unexpected chunk read", self.getSnapshot().value)
+          }
+          self.send({ type: "chunk-read", chunk })
+        }
 
-  dataChannel.onbufferedamountlow = () => {
-    logger.info("[send-file] dataChannel.onbufferedamountlow")
-    readChunk()
-  }
+        return fileReader
+      },
+    }),
 
-  return () => {
-    logger.info("[send-file] closing dataChannel")
-    dataChannel.close()
-  }
+    readChunk: ({ context: { fileReader, file, readerCursor } }) => {
+      fileReader.readAsArrayBuffer(
+        file.slice(readerCursor, readerCursor + CHUNK_SIZE),
+      )
+    },
+
+    setLastChunk: assign({
+      lastChunk: (_, chunk: ArrayBuffer) => chunk,
+    }),
+
+    sendChunk: (
+      { context: { dataChannel, file, readerCursor } },
+      chunk: ArrayBuffer,
+    ) => {
+      logger.info(
+        "[send-file] sending chunk",
+        chunk.byteLength,
+        `${readerCursor}/${file.size}`,
+      )
+      dataChannel.send(chunk)
+    },
+
+    updateCursor: assign({
+      readerCursor: ({ context: { readerCursor, file } }, chunkSize: number) =>
+        Math.min(readerCursor + chunkSize, file.size),
+    }),
+  },
+
+  actors: {
+    closeFile: fromCallback<{ type: "noop" }, Context>(
+      ({ input: { dataChannel } }) => {
+        return () => {
+          logger.info("[send-file] closing dataChannel")
+          dataChannel?.close()
+        }
+      },
+    ),
+  },
+
+  guards: {
+    bufferHasSpace: ({ context: { dataChannel } }) =>
+      dataChannel.bufferedAmount <= dataChannel.bufferedAmountLowThreshold,
+    moreToRead: ({ context: { readerCursor, file } }) =>
+      readerCursor < file.size,
+  },
+}).createMachine({
+  /** @xstate-layout N4IgpgJg5mDOIC5SzAOwgWgGYEsA2YAdDqjgC4DEATmAIaYDGAFgK6oDWA2gAwC6ioAA4B7WORzDUAkAA9EANgAcAFkIBmAEyKAjAE553DQFZuu7ooA0IAJ6I15who3yjitfOVGN27RuUBffysUdGx8Ihp6EigAAmY2dgp4jgxIiB5+JBARMTIJKSy5BAB2DV1CRXlS7mUfRXrdZStbBF9FQhNuLu1uNXddDV7A4LRMXAJCEIhouNYOCgzpHPFJaSKNYuKK4pNjV10jeUG1ZsRleXlHZyMvC9digYCgkCmwiamZ5MTObUyhURWBVA602212N0UByOvVOCAu5WKvW0-TUymKPV0wxeozeRA+qFiXwWGj+2QBeVWhUQGy2ih2hghUOOsIM5QOajaRl8tTUmOer3GRAA7rRxASYlhhFQYgAjFhYLBgKgUOUKpWQWgAW2EbDIeGEQsWWWWFKBsgUKnUWj0BmMpnMsNcqlKLguBm48ncikCz1QwggcGkAvCS3J+TWiAw8lhUaxwYmJHIody4apCGUvMI6NMul55nqXlhGw0VxcRl0xTuxR0ajjOMFhDSnzm7GTgIjCDM3EIaIuPi6hl0ig0RYrjkrhyMOz6KmcddCDfxhJbbdNHeUI5siG0aJ711cvIrFzU3v59fChBFYtikulqsVVFXqeBZ1Kjinuh6Gf2ZRZDmObRKDu1baPOYwXhAkhgE+lIvumyjOhiuZmPUiiFlucIXFmSLeEONxVMUPr+EAA */
+  id: "send-file",
+
+  invoke: {
+    src: "closeFile",
+    input: ({ context }) => context,
+  },
+
+  context: ({ input }) => ({
+    ...input,
+    dataChannel: undefined as any,
+    fileReader: undefined as any,
+    sentBytes: 0,
+    readerCursor: 0,
+  }),
+
+  initial: "init",
+
+  states: {
+    init: {
+      entry: [
+        {
+          type: "createDataChannel",
+        },
+        {
+          type: "createFileReader",
+        },
+      ],
+
+      on: {
+        "read-chunk": "reading chunk",
+      },
+    },
+
+    "reading chunk": {
+      entry: {
+        type: "readChunk",
+      },
+      on: {
+        "chunk-read": {
+          actions: [
+            {
+              type: "setLastChunk",
+              params: ({ event }) => event.chunk,
+            },
+          ],
+
+          target: "sending chunk",
+          reenter: true,
+        },
+      },
+    },
+
+    "sending chunk": {
+      entry: [
+        {
+          type: "sendChunk",
+          params: ({ context }) => context.lastChunk!,
+        },
+        {
+          type: "updateCursor",
+          params: ({ context }) => context.lastChunk!.byteLength,
+        },
+      ],
+
+      always: [
+        {
+          target: "reading chunk",
+          guard: and(["moreToRead", "bufferHasSpace"]),
+        },
+        {
+          target: "done",
+          guard: not("moreToRead"),
+        },
+        {
+          target: "waiting for buffer",
+        },
+      ],
+    },
+
+    "waiting for buffer": {
+      on: {
+        bufferedamountlow: {
+          target: "reading chunk",
+          actions: () => {
+            logger.info("[send-file] bufferedamountlow")
+          },
+        },
+      },
+    },
+
+    done: {
+      type: "final",
+    },
+  },
 })
