@@ -1,6 +1,7 @@
 import "../styles/globals.css"
 import "../styles/reset.css"
 
+import { Analytics } from "@vercel/analytics/react"
 import { GeistSans } from "geist/font/sans"
 import { PropsWithChildren } from "react"
 
@@ -47,6 +48,7 @@ export default async function RootLayout({ children }: PropsWithChildren) {
         )}
       >
         <main className="min-h-screen bg-background">
+          {process.env.NODE_ENV === "production" && <Analytics />}
           <ReactQueryProvider>
             <AuthProvider>{children}</AuthProvider>
           </ReactQueryProvider>
