@@ -5,5 +5,5 @@ main {
 }
 
 * {
-  @apply min-w-0 shrink-0;
+  @apply min-w-0 shrink-0 scrollbar scrollbar-track-transparent scrollbar-thumb-white/40;
 }

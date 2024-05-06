@@ -43,7 +43,11 @@ const config = {
       },
     },
   },
-  plugins: [require("tailwindcss-animate"), plugin],
+  plugins: [
+    require("tailwindcss-animate"),
+    plugin,
+    require("tailwind-scrollbar"),
+  ],
 } satisfies Config
 
 export default config
