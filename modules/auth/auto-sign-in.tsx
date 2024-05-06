@@ -22,6 +22,8 @@ export function AutoSignIn() {
         return res.data
       })
 
+      logger.child(data).info("[auto-sign-in] Data")
+
       return data
     },
   })
