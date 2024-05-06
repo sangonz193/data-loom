@@ -47,15 +47,9 @@ export function AutoSignIn() {
   const router = useRouter()
   useEffect(() => {
     if (data?.user) {
-      alert("refresh called")
       router.refresh()
     }
   }, [data?.user, router])
-
-  useEffect(() => {
-    console.log("mounted")
-    return () => console.log("unmounted")
-  }, [])
 
   return <>{isPending && <Spinner className="mx-auto mt-5" />}</>
 }
