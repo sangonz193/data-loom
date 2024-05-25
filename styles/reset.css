@@ -5,5 +5,5 @@ main {
 }
 
 * {
-  @apply min-w-0 shrink-0 scrollbar-thin scrollbar-track-background scrollbar-thumb-white/40;
+  @apply min-w-0 shrink-0 scrollbar-thin scrollbar-track-background scrollbar-thumb-foreground/40;
 }
