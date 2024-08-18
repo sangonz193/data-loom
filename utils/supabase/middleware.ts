@@ -18,6 +18,9 @@ export const updateSession = async (request: NextRequest) => {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
+        global: {
+          headers: { Authorization: request.headers.get("Authorization")! },
+        },
         cookies: {
           get(name: string) {
             return request.cookies.get(name)?.value
