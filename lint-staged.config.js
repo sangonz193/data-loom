@@ -8,8 +8,10 @@ const config = {
       eslintFileExtensions.some((extension) => filename.endsWith(extension)),
     )
 
+    const eslintFiles = await removeEslintIgnoredFiles(eslintFilenames)
+
     return [
-      `eslint --fix ${await removeEslintIgnoredFiles(eslintFilenames)}`,
+      ...(eslintFiles ? [`eslint --fix ${eslintFiles}`] : []),
       `prettier --ignore-unknown --write ${filenames.map((file) => `"${file}"`).join(" ")}`,
     ]
   },
