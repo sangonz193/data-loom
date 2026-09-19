@@ -1,4 +1,4 @@
-import { MergeDeep } from "type-fest"
+import type { MergeDeep } from "type-fest"
 
 import * as Generated from "./types.gen"
 

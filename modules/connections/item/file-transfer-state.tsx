@@ -1,7 +1,7 @@
 import { useSelector } from "@xstate/react"
 import { filesize } from "filesize"
 import { CheckCircleIcon, FileIcon } from "lucide-react"
-import { ActorRefFrom } from "xstate"
+import type { ActorRefFrom } from "xstate"
 import { z } from "zod"
 
 import { cn } from "@/lib/cn"

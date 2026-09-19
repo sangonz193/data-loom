@@ -15,7 +15,7 @@ import { Button } from "../../../components/ui/button"
 import { useRequiredUser } from "../../auth/use-user"
 import { DeleteConnection } from "../delete-connection"
 import { IncomingFileSharingRequests } from "../file-sharing-requests/incoming-file-sharing-requests"
-import { ListenToFileRequestTableOutputEvent } from "../file-sharing-requests/listen-to-file-request-table"
+import type { ListenToFileRequestTableOutputEvent } from "../file-sharing-requests/listen-to-file-request-table"
 import { useUserConnectionsQuery } from "../use-user-connections"
 
 type Props = {

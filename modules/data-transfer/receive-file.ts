@@ -93,10 +93,15 @@ export const receiveFileActor = setup({
         return writer
       },
     ),
-    writeChunk: fromPromise<void, Context>(
+    writeChunk: fromPromise<number, Context>(
       async ({ input: { chunks, writer } }) => {
-        logger.info("[receive-file] Writing chunk", chunks[0].byteLength)
-        await writer!.write(chunks[0])
+        const [chunk] = chunks
+
+        if (!chunk) throw new Error("No chunk available to write")
+
+        logger.info("[receive-file] Writing chunk", chunk.byteLength)
+        await writer!.write(chunk)
+        return chunk.byteLength
       },
     ),
   },
@@ -196,7 +201,7 @@ export const receiveFileActor = setup({
                   actions: [
                     {
                       type: "updateWrittenBytes",
-                      params: ({ context }) => context.chunks[0].byteLength,
+                      params: ({ event }) => event.output,
                     },
                     "unshiftChunks",
                   ],

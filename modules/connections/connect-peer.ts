@@ -1,5 +1,4 @@
 import { fromCallback } from "xstate"
-import { InvokeCallback } from "xstate/dist/declarations/src/actors/callback"
 
 import { logger } from "@/logger"
 
@@ -48,11 +47,10 @@ export type ConnectPeerOutputEvent =
       error: ConnectPeerError
     }
 
-const invoke: InvokeCallback<
-  ConnectPeerInputEvent,
-  ConnectPeerOutputEvent,
-  Input
-> = ({ sendBack, receive, input }) => {
+type Callback = Parameters<typeof fromCallback<ConnectPeerInputEvent, Input>>[0]
+
+const invoke: Callback = ({ sendBack: send, receive, input }) => {
+  const sendBack = send as (event: ConnectPeerOutputEvent) => void
   const { calling, peerConnection } = input
   let dummyDataChannel: RTCDataChannel | undefined
   let pendingIceCandidates: RTCIceCandidate[] = []
@@ -188,4 +186,4 @@ const invoke: InvokeCallback<
   }
 }
 
-export const connectPeer = fromCallback(invoke)
+export const connectPeer = fromCallback<ConnectPeerInputEvent, Input>(invoke)

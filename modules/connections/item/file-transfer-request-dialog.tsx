@@ -1,6 +1,6 @@
 import { filesize } from "filesize"
 import { useMemo } from "react"
-import { Actor, StateFrom } from "xstate"
+import type { Actor, StateFrom } from "xstate"
 import { z } from "zod"
 
 import { getUserName } from "@/components/avatar"
@@ -40,10 +40,12 @@ export function FileTransferRequestDialog({ send, state, remoteUser }: Props) {
 
     const totalSize = metadata.reduce((acc, file) => acc + file.size, 0)
 
-    if (metadata.length !== 1) {
-      description += ` ${metadata.length} files (${filesize(totalSize)} total)`
+    const [file] = metadata
+
+    if (metadata.length === 1 && file) {
+      description += ` "${file.name}" (${filesize(totalSize)})`
     } else {
-      description += ` "${metadata[0].name}" (${filesize(totalSize)})`
+      description += ` ${metadata.length} files (${filesize(totalSize)} total)`
     }
 
     description += `. Do you want to accept it?`

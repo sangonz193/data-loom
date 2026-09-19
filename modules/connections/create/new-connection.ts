@@ -1,18 +1,14 @@
-import { SupabaseClient, User } from "@supabase/supabase-js"
+import type { SupabaseClient, User } from "@supabase/supabase-js"
 import { assign, fromCallback, fromPromise, setup } from "xstate"
 
 import { logger } from "@/logger"
-import { Database, Tables } from "@/supabase/types"
+import type { Database, Tables } from "@/supabase/types"
 
 import { createPairingCode, redeemPairingCode } from "./actions"
-import {
-  CallerOutputEvent,
-  connectCallerPeerMachine,
-} from "../connect-caller-peer"
-import {
-  ReceiverOutputEvent,
-  connectReceiverPeerMachine,
-} from "../connect-receiver-peer"
+import type { CallerOutputEvent } from "../connect-caller-peer"
+import { connectCallerPeerMachine } from "../connect-caller-peer"
+import type { ReceiverOutputEvent } from "../connect-receiver-peer"
+import { connectReceiverPeerMachine } from "../connect-receiver-peer"
 
 type Input = {
   supabase: SupabaseClient<Database>

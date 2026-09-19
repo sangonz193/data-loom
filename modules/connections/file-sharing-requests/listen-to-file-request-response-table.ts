@@ -1,7 +1,7 @@
-import { AnyEventObject, fromCallback } from "xstate"
+import { type AnyEventObject, fromCallback } from "xstate"
 
 import { logger } from "@/logger"
-import { Database, Tables } from "@/supabase/types"
+import type { Database, Tables } from "@/supabase/types"
 import { createClient } from "@/utils/supabase/client"
 
 type Input = {

@@ -1,5 +1,4 @@
 import { fromCallback } from "xstate"
-import { InvokeCallback } from "xstate/dist/declarations/src/actors/callback"
 
 import { logger } from "@/logger"
 
@@ -17,11 +16,10 @@ export type PeerConnectionEventsOutputEvents =
       event: RTCPeerConnectionEventMap["connectionstatechange"]
     }
 
-const callback: InvokeCallback<
-  { type: "noop" },
-  PeerConnectionEventsOutputEvents,
-  Input
-> = ({ input, sendBack }) => {
+type Callback = Parameters<typeof fromCallback<{ type: "noop" }, Input>>[0]
+
+const callback: Callback = ({ input, sendBack: send }) => {
+  const sendBack = send as (event: PeerConnectionEventsOutputEvents) => void
   const { peerConnection } = input
 
   const eventHandlers: {
@@ -58,4 +56,6 @@ const callback: InvokeCallback<
   }
 }
 
-export const peerConnectionEvents = fromCallback(callback)
+export const peerConnectionEvents = fromCallback<{ type: "noop" }, Input>(
+  callback,
+)

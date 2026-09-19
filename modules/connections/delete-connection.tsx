@@ -12,7 +12,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Button, buttonVariants } from "@/components/ui/button"
-import { Tables, TablesInsert } from "@/supabase/types"
+import type { Tables, TablesInsert } from "@/supabase/types"
 import { createClient } from "@/utils/supabase/client"
 
 type Props = {

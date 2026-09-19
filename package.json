@@ -6,7 +6,7 @@
     "start": "next start",
     "lint": "next lint",
     "prepare": "husky",
-    "postinstall": "patch-package"
+    "typecheck": "node_modules/typescript-7/bin/tsc --build"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.0.5",
@@ -54,11 +54,15 @@
     "eslint-config-prettier": "^9.1.0",
     "husky": "^9.0.11",
     "lint-staged": "^15.2.2",
-    "patch-package": "^8.0.0",
     "prettier": "^3.2.5",
     "prettier-plugin-tailwindcss": "^0.5.14",
     "supabase": "^1.162.4",
     "type-fest": "^4.15.0",
-    "typescript": "5.3.3"
-  }
+    "typescript": "5.9.3",
+    "typescript-7": "npm:typescript@^7"
+  },
+  "patchedDependencies": {
+    "xstate@5.11.0": "patches/xstate+5.11.0.patch"
+  },
+  "packageManager": "bun@1.4.2"
 }

@@ -1,4 +1,4 @@
-import { User } from "@supabase/supabase-js"
+import type { User } from "@supabase/supabase-js"
 import { fromPromise } from "xstate"
 
 import { logger } from "@/logger"

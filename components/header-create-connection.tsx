@@ -1,6 +1,6 @@
 "use client"
 
-import { ComponentProps } from "react"
+import type { ComponentProps } from "react"
 
 import { CreateConnectionDialog } from "@/modules/connections/create/dialog/create-connection-dialog"
 import { useUserConnectionsQuery } from "@/modules/connections/use-user-connections"

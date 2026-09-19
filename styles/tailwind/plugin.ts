@@ -1,4 +1,4 @@
-import { CSSRuleObject, PluginAPI } from "tailwindcss/types/config"
+import type { CSSRuleObject, PluginAPI } from "tailwindcss/types/config"
 
 import { themes } from "../colors"
 

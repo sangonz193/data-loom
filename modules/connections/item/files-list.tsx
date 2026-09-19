@@ -1,6 +1,6 @@
 import { useSelector } from "@xstate/react"
 import { TrashIcon } from "lucide-react"
-import { ActorRefFrom } from "xstate"
+import type { ActorRefFrom } from "xstate"
 import { z } from "zod"
 
 import { Button } from "@/components/ui/button"

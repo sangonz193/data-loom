@@ -1,6 +1,6 @@
-import { User } from "@supabase/supabase-js"
+import type { User } from "@supabase/supabase-js"
 import {
-  ActorRefFrom,
+  type ActorRefFrom,
   assign,
   enqueueActions,
   fromPromise,
@@ -11,22 +11,18 @@ import {
 import { z } from "zod"
 
 import { logger } from "@/logger"
-import { Tables } from "@/supabase/types"
+import type { Tables } from "@/supabase/types"
 import { createClient } from "@/utils/supabase/client"
 
 import { receiveFileActor } from "../../data-transfer/receive-file"
 import { sendFileActor } from "../../data-transfer/send-file"
 import { connectCallerPeerMachine } from "../connect-caller-peer"
 import { connectReceiverPeerMachine } from "../connect-receiver-peer"
-import {
-  ListenToFileRequestResponseTableOutputEvent,
-  listenToFileRequestResponseTable,
-} from "../file-sharing-requests/listen-to-file-request-response-table"
+import type { ListenToFileRequestResponseTableOutputEvent } from "../file-sharing-requests/listen-to-file-request-response-table"
+import { listenToFileRequestResponseTable } from "../file-sharing-requests/listen-to-file-request-response-table"
 import { requestPayloadSchema } from "../file-sharing-requests/payload"
-import {
-  PeerConnectionEventsOutputEvents,
-  peerConnectionEvents,
-} from "../peer-connection-events"
+import type { PeerConnectionEventsOutputEvents } from "../peer-connection-events"
+import { peerConnectionEvents } from "../peer-connection-events"
 
 type Input = {
   currentUser: User
@@ -112,7 +108,11 @@ export const connectionMachine = setup({
     spawnNextReceiveFile: assign({
       receiveFileRefs: ({ spawn, context, self }) => {
         const nextIndex = context.receiveFileRefs?.length ?? 0
-        const dataChannel = context.dataChannels![nextIndex]
+        const dataChannel = context.dataChannels?.[nextIndex]
+
+        if (!dataChannel) {
+          throw new Error("No data channel available to receive")
+        }
 
         const ref = spawn("receiveFile", {
           input: {
@@ -132,7 +132,9 @@ export const connectionMachine = setup({
     spawnNextSendFile: assign({
       sendFileRefs: ({ spawn, context, self }) => {
         const nextIndex = context.sendFileRefs?.length ?? 0
-        const nextFile = context.filesToSend![nextIndex]
+        const nextFile = context.filesToSend?.[nextIndex]
+
+        if (!nextFile) throw new Error("No file available to send")
         const ref = spawn("sendFile", {
           input: {
             file: nextFile,
