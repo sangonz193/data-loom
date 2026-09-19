@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Actor, StateFrom } from "xstate"
+import type { Actor, StateFrom } from "xstate"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"

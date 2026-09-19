@@ -1,7 +1,7 @@
-diff --git a/node_modules/xstate/dist/declarations/src/State.d.ts b/node_modules/xstate/dist/declarations/src/State.d.ts
+diff --git a/dist/declarations/src/State.d.ts b/dist/declarations/src/State.d.ts
 index 4b77038..42278b0 100644
---- a/node_modules/xstate/dist/declarations/src/State.d.ts
-+++ b/node_modules/xstate/dist/declarations/src/State.d.ts
+--- a/dist/declarations/src/State.d.ts
++++ b/dist/declarations/src/State.d.ts
 @@ -66,7 +66,7 @@ interface MachineSnapshotBase<TContext extends MachineContext, TEvent extends Ev
       * @param event The event to test
       * @returns Whether the event will cause a transition

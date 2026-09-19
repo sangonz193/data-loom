@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect } from "react"
 
 import { logger } from "@/logger"
-import { Database, Tables } from "@/supabase/types"
+import type { Database, Tables } from "@/supabase/types"
 import { createClient } from "@/utils/supabase/client"
 
 import { useRequiredUser } from "../auth/use-user"

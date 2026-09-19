@@ -7,7 +7,7 @@
  * Then, remove the non-color variables (just radius at the moment).
  */
 
-import { ColorId } from "@/supabase/types"
+import type { ColorId } from "@/supabase/types"
 
 export const themes = {
   default: {

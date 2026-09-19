@@ -1,8 +1,13 @@
 "use client"
 
-import { User } from "@supabase/supabase-js"
+import type { User } from "@supabase/supabase-js"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { PropsWithChildren, createContext, useContext, useEffect } from "react"
+import {
+  createContext,
+  type PropsWithChildren,
+  useContext,
+  useEffect,
+} from "react"
 
 import { createClient } from "@/utils/supabase/client"
 

@@ -2,7 +2,7 @@
 
 import { useMachine } from "@xstate/react"
 import { PlusCircleIcon } from "lucide-react"
-import { ComponentProps } from "react"
+import type { ComponentProps } from "react"
 
 import { Button } from "@/components/ui/button"
 import {

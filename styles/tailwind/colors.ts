@@ -10,7 +10,7 @@ const defaultColors = themes.default.dark
 
 for (const key of keys) {
   const split = key.split("-")
-  const group = split[0]
+  const group = split[0] ?? key
   const partOfGroup = keys.some((k) => k.startsWith(`${group}-`))
   const isDefault = group === key
 

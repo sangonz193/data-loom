@@ -3,13 +3,13 @@ import "../styles/reset.css"
 
 import { Analytics } from "@vercel/analytics/react"
 import { GeistSans } from "geist/font/sans"
-import { PropsWithChildren } from "react"
+import type { PropsWithChildren } from "react"
 
 import { Footer } from "@/components/footer"
 import { cn } from "@/lib/cn"
 import { AuthProvider } from "@/modules/auth/provider/server"
 import { themeClassNames } from "@/styles/themeClasses"
-import { Tables } from "@/supabase/types"
+import type { Tables } from "@/supabase/types"
 import { ReactQueryProvider } from "@/utils/react-query/provider"
 import { createClient } from "@/utils/supabase/server"
 

@@ -4,7 +4,7 @@ import {
   intervalToDuration,
   formatDuration,
   milliseconds,
-  Duration,
+  type Duration,
 } from "date-fns"
 import { CheckIcon, CopyIcon } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"

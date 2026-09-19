@@ -1,16 +1,17 @@
-import { SupabaseClient, User } from "@supabase/supabase-js"
+import type { SupabaseClient, User } from "@supabase/supabase-js"
 import { assign, sendTo, setup, sendParent } from "xstate"
 
 import { logger } from "@/logger"
-import { Database, Json } from "@/supabase/types"
+import type { Database, Json } from "@/supabase/types"
 
 import { cleanUpSignalingRowsActor } from "./clean-up-signaling-rows"
-import {
+import type {
   ConnectPeerInputEvent,
   ConnectPeerOutputEvent,
-  connectPeer,
 } from "./connect-peer"
-import { WebRtcSignalsOutputEvent, webRtcSignals } from "./web-rtc-signals"
+import { connectPeer } from "./connect-peer"
+import type { WebRtcSignalsOutputEvent } from "./web-rtc-signals"
+import { webRtcSignals } from "./web-rtc-signals"
 
 type Input = {
   peerConnection: RTCPeerConnection

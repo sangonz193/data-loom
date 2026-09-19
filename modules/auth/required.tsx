@@ -1,10 +1,10 @@
 "use client"
 
-import { User } from "@supabase/supabase-js"
+import type { User } from "@supabase/supabase-js"
 import { redirect, usePathname } from "next/navigation"
-import { PropsWithChildren, createContext, useContext } from "react"
+import { createContext, type PropsWithChildren, useContext } from "react"
 
-import { AutoLoginSearchParams } from "@/app/auto-login/page"
+import type { AutoLoginSearchParams } from "@/app/auto-login/page"
 
 import { useUser } from "./use-user"
 

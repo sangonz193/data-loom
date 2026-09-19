@@ -1,15 +1,13 @@
-import { User } from "@supabase/supabase-js"
+import type { User } from "@supabase/supabase-js"
 import { createActorContext } from "@xstate/react"
-import { PropsWithChildren } from "react"
+import type { PropsWithChildren } from "react"
 import { assign, setup } from "xstate"
 
 import { useRequiredUser } from "@/modules/auth/use-user"
 import { createClient } from "@/utils/supabase/client"
 
-import {
-  ListenToFileRequestTableOutputEvent,
-  listenToFileRequestTable,
-} from "./listen-to-file-request-table"
+import type { ListenToFileRequestTableOutputEvent } from "./listen-to-file-request-table"
+import { listenToFileRequestTable } from "./listen-to-file-request-table"
 
 type Input = {
   supabase: ReturnType<typeof createClient>

@@ -1,9 +1,9 @@
-import { SupabaseClient, User } from "@supabase/supabase-js"
+import type { SupabaseClient, User } from "@supabase/supabase-js"
 import { fromCallback } from "xstate"
 import { z } from "zod"
 
 import { logger } from "@/logger"
-import { Database, Tables } from "@/supabase/types"
+import type { Database, Tables } from "@/supabase/types"
 
 type Input = {
   supabase: SupabaseClient<Database>
