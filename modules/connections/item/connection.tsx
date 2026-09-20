@@ -132,7 +132,7 @@ export function Connection({ connection }: Props) {
       <div className="flex-row-reverse gap-3">
         <DeleteConnection connection={connection} />
 
-        {state.can({ type: "send-files" }) && (
+        {state.can({ type: "send-files", files: [] }) && (
           <Button variant="ghost" onClick={open}>
             <SendIcon className="size-5" />
             Send Files
