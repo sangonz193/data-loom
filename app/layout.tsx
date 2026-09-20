@@ -13,8 +13,9 @@ import type { Tables } from "@/supabase/types"
 import { ReactQueryProvider } from "@/utils/react-query/provider"
 import { createClient } from "@/utils/supabase/server"
 
-const defaultUrl = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
+const defaultUrl =
+  process.env.VERCEL_URL ?
+    `https://${process.env.VERCEL_URL}`
   : "http://localhost:3000"
 
 export const metadata = {

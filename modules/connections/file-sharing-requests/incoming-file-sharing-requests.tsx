@@ -68,9 +68,8 @@ const incomingFileSharingRequestsMachine = setup({
 
         return {
           ...context.handlers,
-          [event.remoteUserId]: remoteUserHandlers?.length
-            ? remoteUserHandlers
-            : undefined,
+          [event.remoteUserId]:
+            remoteUserHandlers?.length ? remoteUserHandlers : undefined,
         }
       },
     }),
