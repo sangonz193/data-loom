@@ -8,11 +8,11 @@ export type AutoLoginSearchParams = {
 }
 
 export default async function Page(props: {
-  searchParams: AutoLoginSearchParams
+  searchParams: Promise<AutoLoginSearchParams>
 }) {
-  const { searchParams } = props
+  const searchParams = await props.searchParams
   const redirectTo = searchParams.redirectTo
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const {
     data: { user },
