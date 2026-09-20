@@ -35,7 +35,7 @@ Note: Connection codes expire after 5 minutes. For a new code, simply restart th
    ```bash
    bunx supabase start
    ```
-3. Create a `.env.local` based on the `.env.example` file. You can get the Supabase variables from the output of the previous command, or by running:
+3. Envwire generates `.env` from `.env.template` when the development server starts. To override the local defaults, create an ignored `.env.local` with values from the previous command, or from:
    ```bash
    bunx supabase status
    ```

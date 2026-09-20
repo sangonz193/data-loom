@@ -1,12 +1,13 @@
 {
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "bun run env && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "env": "envwire",
     "prepare": "husky",
     "typecheck": "node_modules/typescript-7/bin/tsc --build"
   },
@@ -49,6 +50,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "encoding": "^0.1.13",
+    "envwire": "^0.0.1",
     "eslint": "^9.22.0",
     "eslint-config-next": "^16",
     "eslint-config-prettier": "^10.1.0",
@@ -57,7 +59,7 @@
     "prettier": "^3.2.5",
     "prettier-plugin-sql": "^0.20.0",
     "prettier-plugin-tailwindcss": "^0.5.14",
-    "supabase": "^1.162.4",
+    "supabase": "2.116.0",
     "type-fest": "^4.15.0",
     "typescript": "5.9.3",
     "typescript-7": "npm:typescript@^7"
