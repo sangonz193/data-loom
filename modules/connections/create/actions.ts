@@ -9,7 +9,7 @@ import { createClient } from "@/utils/supabase/server"
 import { CODE_EXPIRATION_MINUTES, CODE_LENGTH } from "./constants"
 
 export async function createPairingCode() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const supabaseAdmin = createAdminClient()
 
   const {
@@ -50,7 +50,7 @@ function getRandomCode() {
 
 export async function redeemPairingCode(code: string) {
   const supabaseAdmin = createAdminClient()
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const {
     data: { user },

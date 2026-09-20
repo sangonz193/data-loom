@@ -1,6 +1,6 @@
 import { useMachine } from "@xstate/react"
 import { SendIcon } from "lucide-react"
-import { useEffect, useRef } from "react"
+import { useEffect } from "react"
 import { useDropzone } from "react-dropzone"
 
 import { Avatar, getUserName } from "@/components/avatar"
@@ -25,7 +25,6 @@ type Props = {
 }
 
 export function Connection({ connection }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
   const user = useRequiredUser()
 
@@ -40,7 +39,7 @@ export function Connection({ connection }: Props) {
       remoteUserId,
     },
   })
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     noClick: true,
     noKeyboard: true,
     noDrag: state.value !== "idle",
@@ -117,12 +116,7 @@ export function Connection({ connection }: Props) {
           )}
         </div>
 
-        <input
-          {...getInputProps({
-            ref: inputRef,
-            className: "hidden",
-          })}
-        />
+        <input {...getInputProps({ className: "hidden" })} />
 
         {state.value === "prompting user to accept connection" && (
           <FileTransferRequestDialog
@@ -139,7 +133,7 @@ export function Connection({ connection }: Props) {
         <DeleteConnection connection={connection} />
 
         {state.can({ type: "send-files" }) && (
-          <Button variant="ghost" onClick={() => inputRef.current?.click()}>
+          <Button variant="ghost" onClick={open}>
             <SendIcon className="size-5" />
             Send Files
           </Button>

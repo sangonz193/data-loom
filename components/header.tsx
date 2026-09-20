@@ -10,7 +10,7 @@ type Props = {
 }
 
 export async function Header({ user }: Props) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data: profile } = await supabase
     .from("users")
     .select("animals(*),colors(*)")

@@ -2,8 +2,8 @@ import { redirect } from "next/navigation"
 
 import { createClient } from "@/utils/supabase/server"
 
-export function getUser() {
-  const supabase = createClient()
+export async function getUser() {
+  const supabase = await createClient()
   return supabase.auth.getUser().then(({ data }) => data.user)
 }
 

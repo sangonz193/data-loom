@@ -26,7 +26,7 @@ export const metadata = {
 }
 
 export default async function RootLayout({ children }: PropsWithChildren) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const authUser = await supabase.auth.getUser().then((res) => res.data.user)
   let user: Tables<"users"> | null = null
   if (authUser) {

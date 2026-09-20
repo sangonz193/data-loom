@@ -1,4 +1,4 @@
-import { createServerClient, type CookieOptions } from "@supabase/ssr"
+import { createServerClient } from "@supabase/ssr"
 import { type NextRequest, NextResponse } from "next/server"
 
 import type { Database } from "@/supabase/types"
@@ -16,47 +16,27 @@ export const updateSession = async (request: NextRequest) => {
 
     const supabase = createServerClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
       {
         cookies: {
-          get(name: string) {
-            return request.cookies.get(name)?.value
+          getAll() {
+            return request.cookies.getAll()
           },
-          set(name: string, value: string, options: CookieOptions) {
-            // If the cookie is updated, update the cookies for the request and response
-            request.cookies.set({
-              name,
-              value,
-              ...options,
-            })
+          setAll(cookiesToSet, headers) {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              request.cookies.set({ name, value, ...options }),
+            )
             response = NextResponse.next({
               request: {
                 headers: request.headers,
               },
             })
-            response.cookies.set({
-              name,
-              value,
-              ...options,
-            })
-          },
-          remove(name: string, options: CookieOptions) {
-            // If the cookie is removed, update the cookies for the request and response
-            request.cookies.set({
-              name,
-              value: "",
-              ...options,
-            })
-            response = NextResponse.next({
-              request: {
-                headers: request.headers,
-              },
-            })
-            response.cookies.set({
-              name,
-              value: "",
-              ...options,
-            })
+            Object.entries(headers).forEach(([key, value]) =>
+              response.headers.set(key, value),
+            )
+            cookiesToSet.forEach(({ name, value, options }) =>
+              response.cookies.set({ name, value, ...options }),
+            )
           },
         },
       },
@@ -67,7 +47,7 @@ export const updateSession = async (request: NextRequest) => {
     await supabase.auth.getUser()
 
     return response
-  } catch (e) {
+  } catch {
     // If you are here, a Supabase client could not be created!
     // This is likely because you have not set up environment variables.
     // Check out http://localhost:3000 for Next Steps.

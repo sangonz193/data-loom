@@ -1,16 +1,13 @@
-import { FlatCompat } from "@eslint/eslintrc"
 import js from "@eslint/js"
 import { defineConfig, globalIgnores } from "eslint/config"
+import nextVitals from "eslint-config-next/core-web-vitals"
+import nextTypescript from "eslint-config-next/typescript"
 import prettier from "eslint-config-prettier/flat"
-
-const compat = new FlatCompat({ baseDirectory: import.meta.dirname })
 
 export default defineConfig([
   js.configs.recommended,
-  ...compat.extends(
-    "eslint-config-next/core-web-vitals",
-    "eslint-config-next/typescript",
-  ),
+  ...nextVitals,
+  ...nextTypescript,
   {
     rules: {
       "import/order": [
