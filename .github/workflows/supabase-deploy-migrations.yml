@@ -4,7 +4,14 @@ on:
   push:
     branches:
       - main
+    paths:
+      - supabase/migrations/**
+      - .github/workflows/supabase-deploy-migrations.yml
   workflow_dispatch:
+
+concurrency:
+  group: deploy-migrations
+  cancel-in-progress: false
 
 jobs:
   migrations:
@@ -24,5 +31,5 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      - run: bunx --no-install supabase link --project-ref $SUPABASE_PROJECT_ID
-      - run: bunx --no-install supabase db push
+      - run: bunx --no-install supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - run: bunx --no-install supabase db push --linked --yes
