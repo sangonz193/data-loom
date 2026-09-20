@@ -20,9 +20,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: supabase/setup-cli@v3
-        with:
-          version: 1.162.4
+      - uses: oven-sh/setup-bun@v2
 
-      - run: supabase link --project-ref $SUPABASE_PROJECT_ID
-      - run: supabase db push
+      - run: bun install --frozen-lockfile
+
+      - run: bunx --no-install supabase link --project-ref $SUPABASE_PROJECT_ID
+      - run: bunx --no-install supabase db push

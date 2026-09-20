@@ -14,16 +14,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: supabase/setup-cli@v3
-        with:
-          version: 1.162.4
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile
 
       - name: Start Supabase local development setup
-        run: supabase start
+        run: bunx --no-install supabase start
 
       - name: Verify generated types are checked in
         run: |
-          supabase gen types typescript --local > supabase/types.gen.ts
+          bunx --no-install supabase gen types typescript --local > supabase/types.gen.ts
           if ! git diff --ignore-space-at-eol --exit-code --quiet supabase/types.gen.ts; then
             echo "Detected uncommitted changes after build. See status below:"
             git diff
