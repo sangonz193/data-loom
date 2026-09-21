@@ -1,9 +1,7 @@
-import type { User } from "@supabase/supabase-js"
 import { createActorContext } from "@xstate/react"
 import type { PropsWithChildren } from "react"
 import { assign, setup } from "xstate"
 
-import { useRequiredUser } from "@/modules/auth/use-user"
 import { createClient } from "@/utils/supabase/client"
 
 import type { ListenToFileRequestTableOutputEvent } from "./listen-to-file-request-table"
@@ -11,7 +9,6 @@ import { listenToFileRequestTable } from "./listen-to-file-request-table"
 
 type Input = {
   supabase: ReturnType<typeof createClient>
-  currentUser: User
 }
 
 interface Context extends Input {
@@ -77,7 +74,7 @@ const incomingFileSharingRequestsMachine = setup({
       { context },
       event: ListenToFileRequestTableOutputEvent,
     ) => {
-      const handlers = context.handlers[event.fileRequest.from_user_id] ?? []
+      const handlers = context.handlers[event.fileRequest.from_person_id] ?? []
       handlers.forEach((handler) => handler(event))
     },
   },
@@ -133,14 +130,11 @@ export const IncomingFileSharingRequests = createActorContext(
 export function IncomingFileSharingRequestsProvider({
   children,
 }: PropsWithChildren) {
-  const user = useRequiredUser()
-
   return (
     <IncomingFileSharingRequests.Provider
       options={{
         input: {
           supabase: createClient(),
-          currentUser: user,
         },
       }}
     >

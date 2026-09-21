@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog"
 import { Spinner } from "@/components/ui/spinner"
 import { useRequiredUser } from "@/modules/auth/use-user"
+import { useDevice } from "@/modules/connections/use-device"
 import { createClient } from "@/utils/supabase/client"
 
 import { ConnectionErrored } from "./connection-errored"
@@ -44,12 +45,21 @@ export function CreateConnectionDialog({ className, size = "sm" }: Props) {
 }
 
 function Content() {
+  const device = useDevice()
+
+  if (!device) return <Spinner />
+
+  return <MachineContent deviceId={device.id} />
+}
+
+function MachineContent({ deviceId }: { deviceId: string }) {
   const user = useRequiredUser()
   const supabase = createClient()
   const [state, send] = useMachine(newConnectionMachine, {
     input: {
       supabase,
       currentUser: user,
+      deviceId,
     },
   })
 

@@ -2,9 +2,13 @@ import type { SupabaseClient, User } from "@supabase/supabase-js"
 import { assign, fromCallback, fromPromise, setup } from "xstate"
 
 import { logger } from "@/logger"
-import type { Database, Tables } from "@/supabase/types"
+import type { Database } from "@/supabase/types"
 
-import { createPairingCode, redeemPairingCode } from "./actions"
+import {
+  createConnection,
+  createPairingCode,
+  redeemPairingCode,
+} from "./actions"
 import type { CallerOutputEvent } from "../connect-caller-peer"
 import { connectCallerPeerMachine } from "../connect-caller-peer"
 import type { ReceiverOutputEvent } from "../connect-receiver-peer"
@@ -13,6 +17,7 @@ import { connectReceiverPeerMachine } from "../connect-receiver-peer"
 type Input = {
   supabase: SupabaseClient<Database>
   currentUser: User
+  deviceId: string
 }
 
 interface Context extends Input {
@@ -79,26 +84,25 @@ export const newConnectionMachine = setup({
     createCode: fromPromise(() => createPairingCode()),
     listenForRedemptions: fromCallback<{ type: "noop" }, Context>((params) => {
       const sendBack = params.sendBack as (event: Event) => void
-      const { supabase, createdCode } = params.input
+      const { supabase, createdCode, deviceId } = params.input
 
       const channel = supabase
-        .channel(Math.random().toString().substring(2, 20))
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "pairing_code_redemptions",
-            filter: `${"pairing_code" satisfies keyof Tables<"pairing_code_redemptions">}=eq.${createdCode!.code}`,
-          },
-          (payload) => {
-            const newRow = payload.new as Tables<"pairing_code_redemptions">
-            sendBack({
-              type: "redemption-received",
-              remoteUserId: newRow.user_id,
-            })
-          },
-        )
+        .channel(`device:${deviceId}`, { config: { private: true } })
+        .on("broadcast", { event: "pairing-redemption" }, ({ payload }) => {
+          const redemption = payload as {
+            code?: string
+            remotePersonId?: string
+          }
+          if (
+            redemption.code !== createdCode?.code ||
+            !redemption.remotePersonId
+          )
+            return
+          sendBack({
+            type: "redemption-received",
+            remoteUserId: redemption.remotePersonId,
+          })
+        })
         .subscribe((status, err) => {
           logger.info(
             "[new-connection] Listening to pairing code redemption status:",
@@ -116,21 +120,8 @@ export const newConnectionMachine = setup({
       }
     }),
     createUserConnection: fromPromise<void, Context>(
-      async ({ input: { currentUser, supabase, remoteUserId } }) => {
-        const { error } = await supabase.from("user_connections").upsert(
-          {
-            user_1_id: currentUser.id,
-            user_2_id: remoteUserId!,
-          },
-          {
-            onConflict: `${"user_1_id" satisfies keyof Tables<"user_connections">},${"user_2_id" satisfies keyof Tables<"user_connections">}"`,
-          },
-        )
-
-        if (error) {
-          logger.error("[new-connection] Error creating user connection", error)
-          throw error
-        }
+      async ({ input: { remoteUserId } }) => {
+        await createConnection(remoteUserId!)
       },
     ),
     redeemCode: fromPromise(({ input }: { input: Context }) =>
@@ -251,7 +242,7 @@ export const newConnectionMachine = setup({
           actions: [
             {
               type: "saveRemoteUserIdToContext",
-              params: ({ event }) => event.output.remoteUserId,
+              params: ({ event }) => event.output.remotePersonId,
             },
             "createPeer",
           ],

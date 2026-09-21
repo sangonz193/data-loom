@@ -18,6 +18,7 @@ import { receiveFileActor } from "../../data-transfer/receive-file"
 import { sendFileActor } from "../../data-transfer/send-file"
 import { connectCallerPeerMachine } from "../connect-caller-peer"
 import { connectReceiverPeerMachine } from "../connect-receiver-peer"
+import { createShareRequest, respondToShareRequest } from "../create/actions"
 import type { ListenToFileRequestResponseTableOutputEvent } from "../file-sharing-requests/listen-to-file-request-response-table"
 import { listenToFileRequestResponseTable } from "../file-sharing-requests/listen-to-file-request-response-table"
 import { requestPayloadSchema } from "../file-sharing-requests/payload"
@@ -27,6 +28,7 @@ import { peerConnectionEvents } from "../peer-connection-events"
 type Input = {
   currentUser: User
   remoteUserId: string
+  deviceId: string
   supabase: ReturnType<typeof createClient>
 }
 
@@ -36,7 +38,7 @@ interface Context extends Input {
   dataChannels?: RTCDataChannel[]
   receiveFileRefs?: ActorRefFrom<typeof receiveFileActor>[]
   sendFileRefs?: ActorRefFrom<typeof sendFileActor>[]
-  request?: Tables<"file_sharing_request">
+  request?: Tables<"share_requests">
 }
 
 type Event =
@@ -48,7 +50,7 @@ type Event =
   | { type: "send-more" }
   | {
       type: "connection-request-received"
-      request: Tables<"file_sharing_request">
+      request: Tables<"share_requests">
     }
   | { type: "accept" }
   | { type: "decline" }
@@ -94,7 +96,7 @@ export const connectionMachine = setup({
       enqueue.assign({ peerConnection: undefined })
     }),
     setRequest: assign({
-      request: (_, request: Tables<"file_sharing_request">) => request,
+      request: (_, request: Tables<"share_requests">) => request,
     }),
     sendResponse: ({ context }, accept: boolean) => {
       sendResponse({ accept, context })
@@ -175,30 +177,21 @@ export const connectionMachine = setup({
     peerConnectionEvents,
     receiveFile: receiveFileActor,
     listenToFileRequestResponseTable,
-    sendRequest: fromPromise<Tables<"file_sharing_request">, Context>(
-      async ({
-        input: { supabase, remoteUserId, currentUser, filesToSend },
-      }) => {
+    sendRequest: fromPromise<Tables<"share_requests">, Context>(
+      async ({ input: { remoteUserId, deviceId, filesToSend } }) => {
         if (!filesToSend) throw new Error("`filesToSend` is not defined")
 
-        const { data, error } = await supabase
-          .from("file_sharing_request")
-          .insert({
-            from_user_id: currentUser.id,
-            to_user_id: remoteUserId,
-            payload: {
-              files: filesToSend!.map((fileToSend) => ({
-                name: fileToSend.name,
-                size: fileToSend.size,
-                mimeType: fileToSend.type,
-              })),
-            } satisfies z.input<typeof requestPayloadSchema>,
-          })
-          .select()
-          .single()
-
-        if (error) throw error
-        return data
+        return createShareRequest({
+          deviceId,
+          toPersonId: remoteUserId,
+          payload: {
+            files: filesToSend.map((fileToSend) => ({
+              name: fileToSend.name,
+              size: fileToSend.size,
+              mimeType: fileToSend.type,
+            })),
+          } satisfies z.input<typeof requestPayloadSchema>,
+        })
       },
     ),
     sendResponse: fromPromise(
@@ -492,15 +485,9 @@ async function sendResponse({
   context: Context
   accept: boolean
 }) {
-  const { supabase, request } = context
-
-  const { data, error } = await supabase
-    .from("file_sharing_request_response")
-    .insert({
-      request_id: request!.id,
-      accepted: accept,
-    })
-
-  if (error) throw error
-  return data
+  return respondToShareRequest({
+    requestId: context.request!.id,
+    accepted: accept,
+    deviceId: context.deviceId,
+  })
 }

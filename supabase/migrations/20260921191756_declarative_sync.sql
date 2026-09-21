@@ -2,6 +2,34 @@
 truncate table "public"."pairing_code_redemptions",
 "public"."pairing_codes";
 
+create table "public"."people" (
+  "id" uuid not null default gen_random_uuid(),
+  "auth_user_id" uuid not null,
+  "color_id" text,
+  "animal_id" text,
+  "created_at" timestamp with time zone not null default now(),
+  constraint "people_auth_user_id_key" unique (auth_user_id),
+  constraint "people_pkey" primary key (id)
+);
+
+insert into
+  "public"."people" (
+    "id",
+    "auth_user_id",
+    "color_id",
+    "animal_id",
+    "created_at"
+  )
+select
+  id,
+  id,
+  color_id,
+  animal_id,
+  created_at
+from
+  "public"."users"
+on conflict ("auth_user_id") do nothing;
+
 set
   local check_function_bodies = off;
 
@@ -137,16 +165,6 @@ create table "public"."devices" (
 );
 
 alter table "public"."devices" ENABLE row LEVEL SECURITY;
-
-create table "public"."people" (
-  "id" uuid not null default gen_random_uuid(),
-  "auth_user_id" uuid not null,
-  "color_id" text,
-  "animal_id" text,
-  "created_at" timestamp with time zone not null default now(),
-  constraint "people_auth_user_id_key" unique (auth_user_id),
-  constraint "people_pkey" primary key (id)
-);
 
 alter table "public"."people" ENABLE row LEVEL SECURITY;
 

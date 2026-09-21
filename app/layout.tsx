@@ -28,12 +28,12 @@ export const metadata = {
 export default async function RootLayout({ children }: PropsWithChildren) {
   const supabase = await createClient()
   const authUser = await supabase.auth.getUser().then((res) => res.data.user)
-  let user: Tables<"users"> | null = null
+  let user: Tables<"people"> | null = null
   if (authUser) {
     user = await supabase
-      .from("users")
+      .from("people")
       .select("*")
-      .eq("id", authUser.id)
+      .eq("auth_user_id", authUser.id)
       .single()
       .then((res) => res.data)
   }

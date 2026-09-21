@@ -10,6 +10,7 @@
     "env": "envwire",
     "prepare": "husky",
     "typecheck": "node_modules/typescript-7/bin/tsc --build",
+    "test": "bun test",
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",

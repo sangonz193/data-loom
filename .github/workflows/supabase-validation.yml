@@ -1,0 +1,25 @@
+name: Supabase Validation
+
+on:
+  pull_request:
+    paths:
+      - supabase/**
+      - package.json
+      - bun.lock
+      - .github/workflows/supabase-validation.yml
+  workflow_dispatch:
+
+jobs:
+  database:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile
+      - run: bunx --no-install supabase start --exclude studio,imgproxy,vector
+      - run: bunx --no-install supabase db reset
+      - if: always()
+        run: bunx --no-install supabase stop

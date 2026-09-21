@@ -2,7 +2,7 @@ import type { SupabaseClient, User } from "@supabase/supabase-js"
 import { assign, sendTo, setup, sendParent } from "xstate"
 
 import { logger } from "@/logger"
-import type { Database, Json } from "@/supabase/types"
+import type { Database } from "@/supabase/types"
 
 import { cleanUpSignalingRowsActor } from "./clean-up-signaling-rows"
 import type {
@@ -10,6 +10,7 @@ import type {
   ConnectPeerOutputEvent,
 } from "./connect-peer"
 import { connectPeer } from "./connect-peer"
+import { sendSignal } from "./create/actions"
 import type { WebRtcSignalsOutputEvent } from "./web-rtc-signals"
 import { webRtcSignals } from "./web-rtc-signals"
 
@@ -18,6 +19,7 @@ type Input = {
   supabase: SupabaseClient<Database>
   currentUser: User
   remoteUserId: string
+  deviceId: string
 }
 
 type Context = Input & {
@@ -59,46 +61,21 @@ export const connectCallerPeerMachine = setup({
       answer: (_, answer: RTCSessionDescriptionInit) => answer,
     }),
     sendOffer: async (
-      { context: { currentUser, remoteUserId, supabase } },
+      { context: { remoteUserId } },
       offer: RTCSessionDescriptionInit,
     ) => {
       logger.info("[connectCallerPeerMachine] sending offer", offer)
-      await supabase
-        .from("web_rtc_signals")
-        .insert({
-          from_user_id: currentUser.id,
-          to_user_id: remoteUserId,
-          payload: offer as unknown as Json,
-        })
-        .then(({ error }) => {
-          if (error)
-            logger.error(
-              "[connectCallerPeerMachine] error sending offer",
-              error,
-            )
-          else logger.info("[connectCallerPeerMachine] offer sent")
-        })
+      await sendSignal({ toPersonId: remoteUserId, payload: offer })
     },
     sendIceCandidate: async (
-      { context: { currentUser, remoteUserId, supabase } },
+      { context: { remoteUserId } },
       candidate: RTCIceCandidate,
     ) => {
       logger.info("[connectCallerPeerMachine] sending ice candidate", candidate)
-      await supabase
-        .from("web_rtc_signals")
-        .insert({
-          from_user_id: currentUser.id,
-          to_user_id: remoteUserId,
-          payload: candidate as unknown as Json,
-        })
-        .then(({ error }) => {
-          if (error)
-            logger.error(
-              "[connectCallerPeerMachine] sendIceCandidate error",
-              error,
-            )
-          else logger.info("[connectCallerPeerMachine] ice candidate sent")
-        })
+      await sendSignal({
+        toPersonId: remoteUserId,
+        payload: candidate.toJSON(),
+      })
     },
     savePendingIceCandidate: assign({
       pendingIceCandidates: (
@@ -108,32 +85,25 @@ export const connectCallerPeerMachine = setup({
     }),
     sendPendingIceCandidates: assign({
       pendingIceCandidates: ({
-        context: { pendingIceCandidates, supabase, remoteUserId, currentUser },
+        context: { pendingIceCandidates, remoteUserId },
       }) => {
         logger.info(
           "[connectCallerPeerMachine] sending pending ice candidates",
           pendingIceCandidates.length,
         )
-        supabase
-          .from("web_rtc_signals")
-          .insert(
-            pendingIceCandidates.map((candidate) => ({
-              from_user_id: currentUser.id,
-              to_user_id: remoteUserId,
-              payload: candidate as unknown as Json,
-            })),
-          )
-          .then(({ error }) => {
-            if (error)
-              logger.error(
-                "[connectCallerPeerMachine] sendPendingIceCandidates error",
-                error,
-              )
-            else
-              logger.info(
-                "[connectCallerPeerMachine] pending ice candidates sent",
-              )
-          })
+        Promise.all(
+          pendingIceCandidates.map((candidate) =>
+            sendSignal({
+              toPersonId: remoteUserId,
+              payload: candidate.toJSON(),
+            }),
+          ),
+        ).catch((error) =>
+          logger.error(
+            "[connectCallerPeerMachine] sendPendingIceCandidates error",
+            error,
+          ),
+        )
 
         return []
       },

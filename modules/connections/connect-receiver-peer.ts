@@ -2,7 +2,7 @@ import type { SupabaseClient, User } from "@supabase/supabase-js"
 import { assign, sendParent, sendTo, setup } from "xstate"
 
 import { logger } from "@/logger"
-import type { Database, Json } from "@/supabase/types"
+import type { Database } from "@/supabase/types"
 
 import { cleanUpSignalingRowsActor } from "./clean-up-signaling-rows"
 import type {
@@ -10,6 +10,7 @@ import type {
   ConnectPeerOutputEvent,
 } from "./connect-peer"
 import { connectPeer } from "./connect-peer"
+import { sendSignal } from "./create/actions"
 import type { WebRtcSignalsOutputEvent } from "./web-rtc-signals"
 import { webRtcSignals } from "./web-rtc-signals"
 
@@ -18,6 +19,7 @@ type Input = {
   supabase: SupabaseClient<Database>
   currentUser: User
   remoteUserId: string
+  deviceId: string
   offer?: RTCSessionDescriptionInit
 }
 
@@ -48,46 +50,24 @@ export const connectReceiverPeerMachine = setup({
       answer: (_, answer: RTCSessionDescriptionInit) => answer,
     }),
     sendAnswer: async (
-      { context: { currentUser, remoteUserId, supabase } },
+      { context: { remoteUserId } },
       answer: RTCSessionDescriptionInit,
     ) => {
       logger.info("[connectReceiverPeerMachine] sending answer", answer)
-      await supabase
-        .from("web_rtc_signals")
-        .insert({
-          from_user_id: currentUser.id,
-          to_user_id: remoteUserId,
-          payload: answer as unknown as Json,
-        })
-        .then(({ error }) => {
-          if (error)
-            logger.error("[connectReceiverPeerMachine] sendAnswer error", error)
-          else logger.info("[connectReceiverPeerMachine] sent answer", answer)
-        })
+      await sendSignal({ toPersonId: remoteUserId, payload: answer })
     },
     sendIceCandidate: async (
-      { context: { currentUser, remoteUserId, supabase } },
+      { context: { remoteUserId } },
       candidate: RTCIceCandidate,
     ) => {
       logger.info(
         "[connectReceiverPeerMachine] sending ice candidate",
         candidate,
       )
-      await supabase
-        .from("web_rtc_signals")
-        .insert({
-          from_user_id: currentUser.id,
-          to_user_id: remoteUserId,
-          payload: candidate as unknown as Json,
-        })
-        .then(({ error }) => {
-          if (error)
-            logger.error(
-              "[connectReceiverPeerMachine] sendIceCandidate error",
-              error,
-            )
-          else logger.info("[connectReceiverPeerMachine] sent ice candidate")
-        })
+      await sendSignal({
+        toPersonId: remoteUserId,
+        payload: candidate.toJSON(),
+      })
     },
   },
   actors: {
