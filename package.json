@@ -9,7 +9,12 @@
     "format:check": "prettier --check .",
     "env": "envwire",
     "prepare": "husky",
-    "typecheck": "node_modules/typescript-7/bin/tsc --build"
+    "typecheck": "node_modules/typescript-7/bin/tsc --build",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:sync": "supabase db schema declarative sync",
+    "db:push": "supabase db push --linked --yes"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1",

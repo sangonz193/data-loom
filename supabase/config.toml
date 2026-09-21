@@ -22,7 +22,7 @@ port = 54322
 shadow_port = 54320
 # The database major version to use. This has to be the same as your remote database's. Run `SHOW
 # server_version;` on the remote database to check.
-major_version = 15
+major_version = 17
 
 [db.pooler]
 enabled = false
@@ -91,6 +91,10 @@ enable_anonymous_sign_ins = true
 # Allow/disallow testing manual linking of accounts
 enable_manual_linking = false
 
+[auth.rate_limit]
+# Number of anonymous sign-ins that can be made per hour per IP address.
+anonymous_users = 30
+
 [auth.email]
 # Allow/disallow new user signups via email to your project.
 enable_signup = true
@@ -98,7 +102,7 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+enable_confirmations = true
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
 max_frequency = "1s"
 
@@ -169,3 +173,8 @@ s3_region = "env(S3_REGION)"
 s3_access_key = "env(S3_ACCESS_KEY)"
 # Configures AWS_SECRET_ACCESS_KEY for S3 bucket
 s3_secret_key = "env(S3_SECRET_KEY)"
+
+# Enables declarative schema migrations through pg-delta.
+[experimental.pgdelta]
+enabled = true
+declarative_schema_path = "./schemas"
