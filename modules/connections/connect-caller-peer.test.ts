@@ -8,7 +8,7 @@ test("starts caller negotiation only after its private signal channel is ready",
 
   const machine = connectCallerPeerMachine.provide({
     actors: {
-      cleanUpSignalingRows: fromPromise(async () => undefined),
+      cleanUpSignalingRows: fromPromise(() => Promise.resolve()),
       connectPeer: fromCallback(() => {
         peerNegotiations += 1
         return () => undefined
