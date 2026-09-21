@@ -8,6 +8,7 @@ import { createClient } from "@/utils/supabase/server"
 
 import { canonicalConnectionIds } from "./connection-ids"
 import { CODE_EXPIRATION_MINUTES, CODE_LENGTH } from "./constants"
+import { canSendSignal } from "./signal-authorization"
 
 const uuid = z.string().uuid()
 
@@ -259,7 +260,33 @@ export async function sendSignal(input: {
     .match({ person_1_id, person_2_id })
     .maybeSingle()
   if (error) throw error
-  if (!connection && person.id !== toPersonId)
+  let freshPairingRedemptions: {
+    fromPersonId: string
+    codePersonId: string
+  }[] = []
+  if (!connection && person.id !== toPersonId) {
+    const { data: redemptions, error: redemptionError } = await admin
+      .from("pairing_code_redemptions")
+      .select("from_person_id, pairing_codes!inner(person_id)")
+      .eq("pairing_codes.purpose", "connection")
+      .gte(
+        "pairing_codes.created_at",
+        subMinutes(new Date(), CODE_EXPIRATION_MINUTES).toISOString(),
+      )
+    if (redemptionError) throw redemptionError
+    freshPairingRedemptions = redemptions.map((redemption) => ({
+      fromPersonId: redemption.from_person_id,
+      codePersonId: redemption.pairing_codes.person_id,
+    }))
+  }
+  if (
+    !canSendSignal({
+      hasConnection: !!connection,
+      fromPersonId: person.id,
+      toPersonId,
+      freshPairingRedemptions,
+    })
+  )
     throw new Error("Connection not found")
 
   const { data: devices, error: devicesError } = await admin
