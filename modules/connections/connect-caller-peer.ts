@@ -129,14 +129,6 @@ export const connectCallerPeerMachine = setup({
 
   invoke: [
     {
-      src: "connectPeer",
-      id: "connectPeer",
-      input: ({ context }) => ({
-        calling: true,
-        peerConnection: context.peerConnection,
-      }),
-    },
-    {
       src: "webRtcSignals",
       id: "webRtcSignals",
       input: ({ context }) => context,
@@ -144,6 +136,12 @@ export const connectCallerPeerMachine = setup({
   ],
 
   states: {
+    "waiting for signaling": {
+      on: {
+        "signals.ready": "cleaning up previous attempts",
+      },
+    },
+
     "waiting for answer": {
       always: {
         target: "setting remote answer",
@@ -179,6 +177,15 @@ export const connectCallerPeerMachine = setup({
     },
 
     "creating offer": {
+      invoke: {
+        src: "connectPeer",
+        id: "connectPeer",
+        input: ({ context }) => ({
+          calling: true,
+          peerConnection: context.peerConnection,
+        }),
+      },
+
       always: {
         target: "waiting for answer",
         guard: "hasOffer",
@@ -194,7 +201,7 @@ export const connectCallerPeerMachine = setup({
     },
   },
 
-  initial: "cleaning up previous attempts",
+  initial: "waiting for signaling",
 
   on: {
     "signals.ice-candidate": {
