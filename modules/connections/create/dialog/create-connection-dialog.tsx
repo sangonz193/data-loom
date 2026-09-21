@@ -65,14 +65,12 @@ function MachineContent({ deviceId }: { deviceId: string }) {
 
   const { createdCode } = state.context
 
-  const loadingStates: (typeof state.value)[] = [
-    "creating code",
-    "connecting caller",
-    "creating user connection",
-
-    "redeeming code",
-    "connecting receiver",
-  ]
+  const isLoading =
+    state.matches("creating code") ||
+    state.matches("connecting caller") ||
+    state.matches("creating user connection") ||
+    state.matches("redeeming code") ||
+    state.matches("connecting receiver")
 
   return (
     <>
@@ -81,14 +79,16 @@ function MachineContent({ deviceId }: { deviceId: string }) {
       {state.value === "idle" && <Idle state={state} send={send} />}
       {state.value === "connected" && <Success />}
 
-      {loadingStates.includes(state.value) && <Spinner />}
+      {isLoading && <Spinner />}
 
-      {state.value === "listening for redemptions" && !!createdCode && (
-        <DisplayCode
-          code={createdCode.code}
-          createdAt={createdCode.created_at}
-        />
-      )}
+      {state.value === "listening for redemptions" &&
+        state.context.isRedemptionListenerReady &&
+        !!createdCode && (
+          <DisplayCode
+            code={createdCode.code}
+            createdAt={createdCode.created_at}
+          />
+        )}
 
       {state.value === "connection errored" && <ConnectionErrored />}
     </>

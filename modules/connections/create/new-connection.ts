@@ -7,6 +7,7 @@ import type { Database } from "@/supabase/types"
 import {
   createConnection,
   createPairingCode,
+  notifyPairingCodeRedeemed,
   redeemPairingCode,
 } from "./actions"
 import type { CallerOutputEvent } from "../connect-caller-peer"
@@ -25,6 +26,7 @@ interface Context extends Input {
   redeemCode?: string
   remoteUserId?: string
   peerConnection?: RTCPeerConnection
+  isRedemptionListenerReady?: boolean
   connectionErrorEvent?: Extract<
     ReceiverOutputEvent,
     { type: "peer-connection.failed" }
@@ -40,6 +42,9 @@ type Event =
   | {
       type: "redemption-received"
       remoteUserId: string
+    }
+  | {
+      type: "redemption-listener.ready"
     }
   | {
       type: "redeem-code"
@@ -75,6 +80,9 @@ export const newConnectionMachine = setup({
     setConnectionErrorEvent: assign({
       connectionErrorEvent: (_, event: Context["connectionErrorEvent"]) =>
         event,
+    }),
+    setRedemptionListenerReady: assign({
+      isRedemptionListenerReady: () => true,
     }),
   },
 
@@ -113,6 +121,9 @@ export const newConnectionMachine = setup({
               "[new-connection] Error listening to pairing code redemption",
               err,
             )
+          if (status === "SUBSCRIBED") {
+            sendBack({ type: "redemption-listener.ready" })
+          }
         })
 
       return () => {
@@ -126,6 +137,9 @@ export const newConnectionMachine = setup({
     ),
     redeemCode: fromPromise(({ input }: { input: Context }) =>
       redeemPairingCode(input.redeemCode!),
+    ),
+    notifyPairingOwner: fromPromise(({ input }: { input: Context }) =>
+      notifyPairingCodeRedeemed(input.redeemCode!),
     ),
     cleanup: fromCallback(({ input }: { input: Context }) => {
       return () => {
@@ -181,6 +195,9 @@ export const newConnectionMachine = setup({
       },
 
       on: {
+        "redemption-listener.ready": {
+          actions: "setRedemptionListenerReady",
+        },
         "redemption-received": {
           target: "connecting caller",
           actions: [
@@ -251,19 +268,35 @@ export const newConnectionMachine = setup({
     },
 
     "connecting receiver": {
+      initial: "waiting for signaling",
       invoke: {
         src: "connectReceiverPeerMachine",
-        onDone: "connected",
+        onDone: "#new-connection.connected",
         input: ({ context }) => ({
           ...context,
           peerConnection: context.peerConnection!,
           remoteUserId: context.remoteUserId!,
         }),
       },
-
+      states: {
+        "waiting for signaling": {
+          on: {
+            "signals.ready": "notifying pairing owner",
+          },
+        },
+        "notifying pairing owner": {
+          invoke: {
+            src: "notifyPairingOwner",
+            input: ({ context }) => context,
+            onDone: "waiting for connection",
+            onError: "#new-connection.connection errored",
+          },
+        },
+        "waiting for connection": {},
+      },
       on: {
         "peer-connection.failed": {
-          target: "connection errored",
+          target: "#new-connection.connection errored",
           actions: {
             type: "setConnectionErrorEvent",
             params: ({ event }) => event,

@@ -12,6 +12,7 @@ type Input = {
 }
 
 export type WebRtcSignalsOutputEvent =
+  | { type: "signals.ready" }
   | { type: "signals.ice-candidate"; iceCandidate: RTCIceCandidate }
   | { type: "signals.answer"; answer: RTCSessionDescriptionInit }
   | { type: "signals.offer"; offer: RTCSessionDescriptionInit }
@@ -19,6 +20,13 @@ export type WebRtcSignalsOutputEvent =
 const candidateSchema = z.object({ candidate: z.string() }).passthrough()
 const answerSchema = z.object({ type: z.literal("answer") }).passthrough()
 const offerSchema = z.object({ type: z.literal("offer") }).passthrough()
+
+export function sendSignalChannelReady(
+  status: string,
+  sendBack: (event: WebRtcSignalsOutputEvent) => void,
+) {
+  if (status === "SUBSCRIBED") sendBack({ type: "signals.ready" })
+}
 
 export const webRtcSignals = fromCallback<{ type: "noop" }, Input>((params) => {
   const sendBack = params.sendBack as (event: WebRtcSignalsOutputEvent) => void
@@ -58,7 +66,10 @@ export const webRtcSignals = fromCallback<{ type: "noop" }, Input>((params) => {
     })
     .subscribe((status, error) => {
       if (error) logger.error("[webRtcSignals] subscription failed", error)
-      else logger.info("[webRtcSignals] subscription", status)
+      else {
+        logger.info("[webRtcSignals] subscription", status)
+        sendSignalChannelReady(status, sendBack)
+      }
     })
 
   return () => {

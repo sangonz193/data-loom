@@ -25,5 +25,6 @@ jobs:
       - run: bunx --no-install supabase db query --local --file supabase/tests/legacy-connections-fixture.sql
       - run: bunx --no-install supabase migration up --local
       - run: bunx --no-install supabase db query --local --file supabase/tests/legacy-connections-assertion.sql
+      - run: bunx --no-install supabase db query --local --file supabase/tests/people-identity-assertion.sql
       - if: always()
         run: bunx --no-install supabase stop

@@ -75,6 +75,24 @@ export async function redeemPairingCode(codeInput: string) {
     .upsert({ code: pairingCode.code, from_person_id: person.id })
   if (redemptionError) throw redemptionError
 
+  return { remotePersonId: pairingCode.person_id }
+}
+
+export async function notifyPairingCodeRedeemed(codeInput: string) {
+  const code = z.string().min(1).max(32).parse(codeInput)
+  const person = await currentPerson()
+  const admin = createAdminClient()
+  const { data: redemption, error: redemptionError } = await admin
+    .from("pairing_code_redemptions")
+    .select("code, pairing_codes!inner(person_id, purpose)")
+    .match({ code, from_person_id: person.id })
+    .eq("pairing_codes.purpose", "connection")
+    .single()
+  if (redemptionError || !redemption)
+    throw redemptionError ?? new Error("Pairing code redemption not found")
+
+  const pairingCode = redemption.pairing_codes
+
   const { data: devices, error: devicesError } = await admin
     .from("devices")
     .select("id")
@@ -85,12 +103,10 @@ export async function redeemPairingCode(codeInput: string) {
       admin.channel(`device:${device.id}`, { config: { private: true } }).send({
         type: "broadcast",
         event: "pairing-redemption",
-        payload: { remotePersonId: person.id, code: pairingCode.code },
+        payload: { remotePersonId: person.id, code },
       }),
     ),
   )
-
-  return { remotePersonId: pairingCode.person_id }
 }
 
 export async function createConnection(remotePersonIdInput: string) {

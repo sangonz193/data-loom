@@ -29,10 +29,9 @@ type Context = Input & {
 
 type Event = WebRtcSignalsOutputEvent | ConnectPeerOutputEvent
 
-export type ReceiverOutputEvent = Extract<
-  ConnectPeerOutputEvent,
-  { type: "peer-connection.failed" }
->
+export type ReceiverOutputEvent =
+  | Extract<ConnectPeerOutputEvent, { type: "peer-connection.failed" }>
+  | { type: "signals.ready" }
 
 export const connectReceiverPeerMachine = setup({
   types: {
@@ -138,6 +137,10 @@ export const connectReceiverPeerMachine = setup({
   initial: "cleaning up previous attempts",
 
   on: {
+    "signals.ready": {
+      actions: sendParent(() => ({ type: "signals.ready" })),
+    },
+
     "signals.ice-candidate": {
       actions: sendTo(
         "connectPeer",
