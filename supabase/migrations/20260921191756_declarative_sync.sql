@@ -140,12 +140,6 @@ drop table "public"."file_sharing_request_response";
 
 drop table "public"."file_sharing_request";
 
-drop table "public"."user_connections";
-
-drop table "public"."users";
-
-drop table "public"."web_rtc_signals";
-
 create table "public"."connections" (
   "person_1_id" uuid not null,
   "person_2_id" uuid not null,
@@ -153,6 +147,26 @@ create table "public"."connections" (
   constraint "connections_check" check ((person_1_id < person_2_id)),
   constraint "connections_pkey" primary key (person_1_id, person_2_id)
 );
+
+insert into
+  "public"."connections" ("person_1_id", "person_2_id", "created_at")
+select
+  least(person_1.id, person_2.id),
+  greatest(person_1.id, person_2.id),
+  user_connections.created_at
+from
+  "public"."user_connections"
+  join "public"."people" as person_1 on person_1.auth_user_id = user_connections.user_1_id
+  join "public"."people" as person_2 on person_2.auth_user_id = user_connections.user_2_id
+where
+  person_1.id <> person_2.id
+on conflict do nothing;
+
+drop table "public"."user_connections";
+
+drop table "public"."users";
+
+drop table "public"."web_rtc_signals";
 
 alter table "public"."connections" ENABLE row LEVEL SECURITY;
 

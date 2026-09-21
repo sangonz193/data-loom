@@ -21,5 +21,9 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bunx --no-install supabase start --exclude studio,imgproxy,vector
       - run: bunx --no-install supabase db reset
+      - run: bunx --no-install supabase db reset --version 20240421181300
+      - run: bunx --no-install supabase db query --local --file supabase/tests/legacy-connections-fixture.sql
+      - run: bunx --no-install supabase migration up --local
+      - run: bunx --no-install supabase db query --local --file supabase/tests/legacy-connections-assertion.sql
       - if: always()
         run: bunx --no-install supabase stop
