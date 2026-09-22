@@ -16,6 +16,8 @@ import { useRequiredUser } from "../../auth/use-user"
 import { DeleteConnection } from "../delete-connection"
 import { IncomingFileSharingRequests } from "../file-sharing-requests/incoming-file-sharing-requests"
 import type { ListenToFileRequestTableOutputEvent } from "../file-sharing-requests/listen-to-file-request-table"
+import { useDevice } from "../use-device"
+import { usePerson } from "../use-person"
 import { useUserConnectionsQuery } from "../use-user-connections"
 
 type Props = {
@@ -25,18 +27,43 @@ type Props = {
 }
 
 export function Connection({ connection }: Props) {
+  const person = usePerson()
+  const device = useDevice()
+
+  if (!person.data || !device) return null
+
+  return (
+    <ConnectionContent
+      connection={connection}
+      deviceId={device.id}
+      personId={person.data.id}
+    />
+  )
+}
+
+function ConnectionContent({
+  connection,
+  deviceId,
+  personId,
+}: Props & { deviceId: string; personId: string }) {
   const supabase = createClient()
   const user = useRequiredUser()
 
-  const remoteUserNumber = user.id === connection.user_1_id ? 2 : 1
-  const remoteUser = connection[`user_${remoteUserNumber}`]
-  const remoteUserId = connection[`user_${remoteUserNumber}_id`]
+  const remoteUser =
+    connection.person_1_id === personId ?
+      connection.person_2
+    : connection.person_1
+  const remoteUserId =
+    connection.person_1_id === personId ?
+      connection.person_2_id
+    : connection.person_1_id
 
   const [state, send, actor] = useMachine(connectionMachine, {
     input: {
       supabase,
       currentUser: user,
       remoteUserId,
+      deviceId,
     },
   })
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
@@ -130,7 +157,7 @@ export function Connection({ connection }: Props) {
       <FilesList actor={actor} />
 
       <div className="flex-row-reverse gap-3">
-        <DeleteConnection connection={connection} />
+        <DeleteConnection remotePersonId={remoteUserId} />
 
         {state.can({ type: "send-files", files: [] }) && (
           <Button variant="ghost" onClick={open}>

@@ -67,100 +67,97 @@ export type Database = {
         }
         Relationships: []
       }
-      file_sharing_request: {
+      connections: {
         Row: {
           created_at: string
-          from_user_id: string
-          id: string
-          payload: Json
-          to_user_id: string
+          person_1_id: string
+          person_2_id: string
         }
         Insert: {
           created_at?: string
-          from_user_id: string
-          id?: string
-          payload: Json
-          to_user_id: string
+          person_1_id: string
+          person_2_id: string
         }
         Update: {
           created_at?: string
-          from_user_id?: string
-          id?: string
-          payload?: Json
-          to_user_id?: string
+          person_1_id?: string
+          person_2_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "file_sharing_request_from_user_id_fkey"
-            columns: ["from_user_id"]
+            foreignKeyName: "connections_person_1_id_fkey"
+            columns: ["person_1_id"]
             isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "people"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "file_sharing_request_to_user_id_fkey"
-            columns: ["to_user_id"]
+            foreignKeyName: "connections_person_2_id_fkey"
+            columns: ["person_2_id"]
             isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "people"
             referencedColumns: ["id"]
           },
         ]
       }
-      file_sharing_request_response: {
+      devices: {
         Row: {
-          accepted: boolean
-          created_at: string
-          request_id: string
+          id: string
+          last_seen_at: string
+          name: string
+          person_id: string
         }
         Insert: {
-          accepted: boolean
-          created_at?: string
-          request_id: string
+          id: string
+          last_seen_at?: string
+          name: string
+          person_id: string
         }
         Update: {
-          accepted?: boolean
-          created_at?: string
-          request_id?: string
+          id?: string
+          last_seen_at?: string
+          name?: string
+          person_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "file_sharing_request_response_request_id_fkey"
-            columns: ["request_id"]
-            isOneToOne: true
-            referencedRelation: "file_sharing_request"
+            foreignKeyName: "devices_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
             referencedColumns: ["id"]
           },
         ]
       }
       pairing_code_redemptions: {
         Row: {
+          code: string
           created_at: string
-          pairing_code: string
-          user_id: string
+          from_person_id: string
         }
         Insert: {
+          code: string
           created_at?: string
-          pairing_code: string
-          user_id: string
+          from_person_id: string
         }
         Update: {
+          code?: string
           created_at?: string
-          pairing_code?: string
-          user_id?: string
+          from_person_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "pairing_code_redemptions_pairing_code_fkey"
-            columns: ["pairing_code"]
+            foreignKeyName: "pairing_code_redemptions_code_fkey"
+            columns: ["code"]
             isOneToOne: true
             referencedRelation: "pairing_codes"
             referencedColumns: ["code"]
           },
           {
-            foreignKeyName: "pairing_code_redemptions_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "pairing_code_redemptions_from_person_id_fkey"
+            columns: ["from_person_id"]
             isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "people"
             referencedColumns: ["id"]
           },
         ]
@@ -169,90 +166,63 @@ export type Database = {
         Row: {
           code: string
           created_at: string
-          user_id: string
+          person_id: string
+          purpose: string
         }
         Insert: {
           code: string
           created_at?: string
-          user_id: string
+          person_id: string
+          purpose: string
         }
         Update: {
           code?: string
           created_at?: string
-          user_id?: string
+          person_id?: string
+          purpose?: string
         }
         Relationships: [
           {
-            foreignKeyName: "pairing_codes_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "pairing_codes_person_id_fkey"
+            columns: ["person_id"]
             isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "people"
             referencedColumns: ["id"]
           },
         ]
       }
-      user_connections: {
-        Row: {
-          created_at: string
-          user_1_id: string
-          user_2_id: string
-        }
-        Insert: {
-          created_at?: string
-          user_1_id: string
-          user_2_id: string
-        }
-        Update: {
-          created_at?: string
-          user_1_id?: string
-          user_2_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_connections_user_1_id_fkey"
-            columns: ["user_1_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_connections_user_2_id_fkey"
-            columns: ["user_2_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      users: {
+      people: {
         Row: {
           animal_id: string | null
+          auth_user_id: string
           color_id: string | null
-          created_at: string | null
+          created_at: string
           id: string
         }
         Insert: {
           animal_id?: string | null
+          auth_user_id: string
           color_id?: string | null
-          created_at?: string | null
-          id: string
+          created_at?: string
+          id?: string
         }
         Update: {
           animal_id?: string | null
+          auth_user_id?: string
           color_id?: string | null
-          created_at?: string | null
+          created_at?: string
           id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "users_animal_id_fkey"
+            foreignKeyName: "people_animal_id_fkey"
             columns: ["animal_id"]
             isOneToOne: false
             referencedRelation: "animals"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "users_color_id_fkey"
+            foreignKeyName: "people_color_id_fkey"
             columns: ["color_id"]
             isOneToOne: false
             referencedRelation: "colors"
@@ -260,41 +230,90 @@ export type Database = {
           },
         ]
       }
-      web_rtc_signals: {
+      share_request_responses: {
         Row: {
+          accepted: boolean
+          accepted_by_device_id: string | null
           created_at: string
-          from_user_id: string
-          id: string
-          payload: Json
-          to_user_id: string
+          request_id: string
         }
         Insert: {
+          accepted: boolean
+          accepted_by_device_id?: string | null
           created_at?: string
-          from_user_id: string
-          id?: string
-          payload: Json
-          to_user_id: string
+          request_id: string
         }
         Update: {
+          accepted?: boolean
+          accepted_by_device_id?: string | null
           created_at?: string
-          from_user_id?: string
-          id?: string
-          payload?: Json
-          to_user_id?: string
+          request_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "web_rtc_signals_from_user_id_fkey"
-            columns: ["from_user_id"]
+            foreignKeyName: "share_request_responses_accepted_by_device_id_fkey"
+            columns: ["accepted_by_device_id"]
             isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "devices"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "web_rtc_signals_to_user_id_fkey"
-            columns: ["to_user_id"]
+            foreignKeyName: "share_request_responses_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: true
+            referencedRelation: "share_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      share_requests: {
+        Row: {
+          created_at: string
+          expires_at: string
+          from_device_id: string
+          from_person_id: string
+          id: string
+          payload: Json
+          to_person_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          from_device_id: string
+          from_person_id: string
+          id?: string
+          payload: Json
+          to_person_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          from_device_id?: string
+          from_person_id?: string
+          id?: string
+          payload?: Json
+          to_person_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "share_requests_from_device_id_fkey"
+            columns: ["from_device_id"]
             isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "share_requests_from_person_id_fkey"
+            columns: ["from_person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "share_requests_to_person_id_fkey"
+            columns: ["to_person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
             referencedColumns: ["id"]
           },
         ]
@@ -304,15 +323,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      insert_if_code_redemption_exists: {
-        Args: { p_to_user_id: string }
+      can_access_share_request: {
+        Args: { share_request_id: string }
         Returns: boolean
       }
-      select_if_own_redemption_exists: {
-        Args: { p_code: string }
+      current_person_id: { Args: never; Returns: string }
+      people_are_connected: {
+        Args: { other_person_id: string }
         Returns: boolean
       }
-      user_has_pairing_code: { Args: { p_code: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never

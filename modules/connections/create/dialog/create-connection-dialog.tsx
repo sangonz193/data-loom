@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog"
 import { Spinner } from "@/components/ui/spinner"
 import { useRequiredUser } from "@/modules/auth/use-user"
+import { useDevice } from "@/modules/connections/use-device"
 import { createClient } from "@/utils/supabase/client"
 
 import { ConnectionErrored } from "./connection-errored"
@@ -44,25 +45,32 @@ export function CreateConnectionDialog({ className, size = "sm" }: Props) {
 }
 
 function Content() {
+  const device = useDevice()
+
+  if (!device) return <Spinner />
+
+  return <MachineContent deviceId={device.id} />
+}
+
+function MachineContent({ deviceId }: { deviceId: string }) {
   const user = useRequiredUser()
   const supabase = createClient()
   const [state, send] = useMachine(newConnectionMachine, {
     input: {
       supabase,
       currentUser: user,
+      deviceId,
     },
   })
 
   const { createdCode } = state.context
 
-  const loadingStates: (typeof state.value)[] = [
-    "creating code",
-    "connecting caller",
-    "creating user connection",
-
-    "redeeming code",
-    "connecting receiver",
-  ]
+  const isLoading =
+    state.matches("creating code") ||
+    state.matches("connecting caller") ||
+    state.matches("creating user connection") ||
+    state.matches("redeeming code") ||
+    state.matches("connecting receiver")
 
   return (
     <>
@@ -71,14 +79,16 @@ function Content() {
       {state.value === "idle" && <Idle state={state} send={send} />}
       {state.value === "connected" && <Success />}
 
-      {loadingStates.includes(state.value) && <Spinner />}
+      {isLoading && <Spinner />}
 
-      {state.value === "listening for redemptions" && !!createdCode && (
-        <DisplayCode
-          code={createdCode.code}
-          createdAt={createdCode.created_at}
-        />
-      )}
+      {state.value === "listening for redemptions" &&
+        state.context.isRedemptionListenerReady &&
+        !!createdCode && (
+          <DisplayCode
+            code={createdCode.code}
+            createdAt={createdCode.created_at}
+          />
+        )}
 
       {state.value === "connection errored" && <ConnectionErrored />}
     </>

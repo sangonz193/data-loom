@@ -1,4 +1,3 @@
-import type { User } from "@supabase/supabase-js"
 import { type AnyEventObject, fromCallback } from "xstate"
 
 import { logger } from "@/logger"
@@ -7,12 +6,11 @@ import { createClient } from "@/utils/supabase/client"
 
 type Input = {
   supabase: ReturnType<typeof createClient>
-  currentUser: User
 }
 
 export type ListenToFileRequestTableOutputEvent = {
   type: "file-request.request"
-  fileRequest: Tables<"file_sharing_request">
+  fileRequest: Tables<"share_requests">
 }
 
 export const listenToFileRequestTable = fromCallback<AnyEventObject, Input>(
@@ -20,7 +18,7 @@ export const listenToFileRequestTable = fromCallback<AnyEventObject, Input>(
     const sendBack = params.sendBack as (
       event: ListenToFileRequestTableOutputEvent,
     ) => void
-    const { supabase, currentUser } = params.input
+    const { supabase } = params.input
 
     const channel = supabase
       .channel("file_requests")
@@ -29,12 +27,10 @@ export const listenToFileRequestTable = fromCallback<AnyEventObject, Input>(
         {
           event: "INSERT",
           schema: "public",
-          table:
-            "file_sharing_request" satisfies keyof Database["public"]["Tables"],
-          filter: `${"to_user_id" satisfies keyof Tables<"file_sharing_request">}=eq.${currentUser.id}`,
+          table: "share_requests" satisfies keyof Database["public"]["Tables"],
         },
         (payload) => {
-          const newRow = payload.new as Tables<"file_sharing_request">
+          const newRow = payload.new as Tables<"share_requests">
           logger.info(
             "[listenToFileRequestTable] Received new file request",
             newRow,

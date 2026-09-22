@@ -1,111 +1,74 @@
-import type { SupabaseClient, User } from "@supabase/supabase-js"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { fromCallback } from "xstate"
 import { z } from "zod"
 
 import { logger } from "@/logger"
-import type { Database, Tables } from "@/supabase/types"
+import type { Database } from "@/supabase/types"
 
 type Input = {
   supabase: SupabaseClient<Database>
-  currentUser: User
+  deviceId: string
   remoteUserId: string | undefined
 }
 
 export type WebRtcSignalsOutputEvent =
-  | {
-      type: "signals.ice-candidate"
-      iceCandidate: RTCIceCandidate
-      remoteUserId: string
-    }
-  | {
-      type: "signals.answer"
-      answer: RTCSessionDescriptionInit
-      remoteUserId: string
-    }
-  | {
-      type: "signals.offer"
-      offer: RTCSessionDescriptionInit
-      remoteUserId: string
-    }
+  | { type: "signals.ready" }
+  | { type: "signals.ice-candidate"; iceCandidate: RTCIceCandidate }
+  | { type: "signals.answer"; answer: RTCSessionDescriptionInit }
+  | { type: "signals.offer"; offer: RTCSessionDescriptionInit }
+
+const candidateSchema = z.object({ candidate: z.string() }).passthrough()
+const answerSchema = z.object({ type: z.literal("answer") }).passthrough()
+const offerSchema = z.object({ type: z.literal("offer") }).passthrough()
+
+export function sendSignalChannelReady(
+  status: string,
+  sendBack: (event: WebRtcSignalsOutputEvent) => void,
+) {
+  if (status === "SUBSCRIBED") sendBack({ type: "signals.ready" })
+}
 
 export const webRtcSignals = fromCallback<{ type: "noop" }, Input>((params) => {
   const sendBack = params.sendBack as (event: WebRtcSignalsOutputEvent) => void
-  const { currentUser, remoteUserId, supabase } = params.input
-
-  function handleRow(newRow: Tables<"web_rtc_signals">) {
-    if (newRow.to_user_id !== currentUser.id) {
-      if (newRow.from_user_id === currentUser.id) {
-        // This is a signal that we sent, ignore it
-      } else {
-        logger.info(
-          `[webRtcSignals] Ignoring signal for another user ${newRow.to_user_id}`,
-        )
-      }
-      return
-    }
-
-    const candidateValidation = candidateSchema.safeParse(newRow.payload)
-    if (candidateValidation.success) {
-      const candidate = candidateValidation.data
-      logger.info("[webRtcSignals] received ice-candidate", candidate)
-      sendBack({
-        type: "signals.ice-candidate",
-        iceCandidate: candidate as unknown as RTCIceCandidate,
-        remoteUserId: newRow.from_user_id,
-      })
-      return
-    }
-
-    const answerValidation = answerSchema.safeParse(newRow.payload)
-    if (answerValidation.success) {
-      const answer = answerValidation.data
-      logger.info("[webRtcSignals] received answer", answer)
-      sendBack({
-        type: "signals.answer",
-        answer: answer as unknown as RTCSessionDescription,
-        remoteUserId: newRow.from_user_id,
-      })
-      return
-    }
-
-    const offerValidation = offerSchema.safeParse(newRow.payload)
-    if (offerValidation.success) {
-      const offer = offerValidation.data
-      logger.info("[webRtcSignals] received offer", offer)
-      sendBack({
-        type: "signals.offer",
-        offer: offer as unknown as RTCSessionDescription,
-        remoteUserId: newRow.from_user_id,
-      })
-      return
-    }
-
-    logger.error(
-      "[webRtcSignals] Ignoring signal with unknown payload",
-      newRow.payload,
-    )
-  }
+  const { deviceId, remoteUserId, supabase } = params.input
 
   const channel = supabase
-    .channel(Math.random().toString().substring(2, 20))
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "web_rtc_signals" satisfies keyof Database["public"]["Tables"],
-        filter: remoteUserId ? `from_user_id=eq.${remoteUserId}` : undefined,
-      },
-      (payload) => {
-        const newRow = payload.new as Tables<"web_rtc_signals">
-        handleRow(newRow)
-      },
-    )
+    .channel(`device:${deviceId}`, { config: { private: true } })
+    .on("broadcast", { event: "signal" }, ({ payload }) => {
+      const signal = payload as { fromPersonId?: string; payload?: unknown }
+      if (remoteUserId && signal.fromPersonId !== remoteUserId) return
+
+      const candidate = candidateSchema.safeParse(signal.payload)
+      if (candidate.success) {
+        sendBack({
+          type: "signals.ice-candidate",
+          iceCandidate: candidate.data as unknown as RTCIceCandidate,
+        })
+        return
+      }
+
+      const answer = answerSchema.safeParse(signal.payload)
+      if (answer.success) {
+        sendBack({
+          type: "signals.answer",
+          answer: answer.data as RTCSessionDescriptionInit,
+        })
+        return
+      }
+
+      const offer = offerSchema.safeParse(signal.payload)
+      if (offer.success) {
+        sendBack({
+          type: "signals.offer",
+          offer: offer.data as RTCSessionDescriptionInit,
+        })
+      }
+    })
     .subscribe((status, error) => {
-      if (error) {
-        logger.error("[webRtcSignals] Error subscribing to channel", error)
-      } else {
-        logger.info("[webRtcSignals] Subscribed to channel", status)
+      if (error) logger.error("[webRtcSignals] subscription failed", error)
+      else {
+        logger.info("[webRtcSignals] subscription", status)
+        sendSignalChannelReady(status, sendBack)
       }
     })
 
@@ -113,21 +76,3 @@ export const webRtcSignals = fromCallback<{ type: "noop" }, Input>((params) => {
     supabase.removeChannel(channel)
   }
 })
-
-const candidateSchema = z
-  .object({
-    candidate: z.string(),
-  })
-  .passthrough()
-
-const answerSchema = z
-  .object({
-    type: z.literal("answer"),
-  })
-  .passthrough()
-
-const offerSchema = z
-  .object({
-    type: z.literal("offer"),
-  })
-  .passthrough()

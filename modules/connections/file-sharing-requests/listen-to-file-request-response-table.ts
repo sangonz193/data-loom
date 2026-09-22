@@ -11,7 +11,7 @@ type Input = {
 
 export type ListenToFileRequestResponseTableOutputEvent = {
   type: "file-request-response"
-  response: Tables<"file_sharing_request_response">
+  response: Tables<"share_request_responses">
 }
 
 export const listenToFileRequestResponseTable = fromCallback<
@@ -31,11 +31,11 @@ export const listenToFileRequestResponseTable = fromCallback<
         event: "INSERT",
         schema: "public",
         table:
-          "file_sharing_request_response" satisfies keyof Database["public"]["Tables"],
-        filter: `${"request_id" satisfies keyof Tables<"file_sharing_request_response">}=eq.${requestId}`,
+          "share_request_responses" satisfies keyof Database["public"]["Tables"],
+        filter: `${"request_id" satisfies keyof Tables<"share_request_responses">}=eq.${requestId}`,
       },
       (payload) => {
-        const newRow = payload.new as Tables<"file_sharing_request_response">
+        const newRow = payload.new as Tables<"share_request_responses">
         logger.info(
           "[listenToFileRequestResponseTable] Received new file request response",
           newRow,

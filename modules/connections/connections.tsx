@@ -30,7 +30,7 @@ export function Connections() {
 
         {data?.map((connection) => (
           <Connection
-            key={`${connection.user_1_id}_${connection.user_2_id}`}
+            key={`${connection.person_1_id}_${connection.person_2_id}`}
             connection={connection}
           />
         ))}

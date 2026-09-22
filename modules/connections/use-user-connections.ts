@@ -2,90 +2,59 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect } from "react"
 
 import { logger } from "@/logger"
-import type { Database, Tables } from "@/supabase/types"
+import type { Database } from "@/supabase/types"
 import { createClient } from "@/utils/supabase/client"
 
-import { useRequiredUser } from "../auth/use-user"
+import { usePerson } from "./use-person"
 
 export function useUserConnectionsQuery() {
   const supabase = createClient()
-  const user = useRequiredUser()
+  const person = usePerson()
 
-  const query = useQuery({
-    queryKey: ["connections", user.id],
+  return useQuery({
+    queryKey: ["connections", person.data?.id],
+    enabled: !!person.data,
     queryFn: async () => {
-      if (!user) return null as never
-
       const { data, error } = await supabase
-        .from("user_connections")
+        .from("connections")
         .select(
-          `*,
-          user_1:users!user_connections_user_1_id_fkey(
-            *,
-            animals(*),
-            colors(*)
-          ),
-          user_2:users!user_connections_user_2_id_fkey(
-            *,
-            animals(*),
-            colors(*)
-          )`,
+          "*, person_1:people!connections_person_1_id_fkey(*, animals(*), colors(*)), person_2:people!connections_person_2_id_fkey(*, animals(*), colors(*))",
         )
-        .or(
-          `${"user_1_id" satisfies keyof Tables<"user_connections">}.eq.${user.id},${"user_2_id" satisfies keyof Tables<"user_connections">}.eq.${user.id}`,
-        )
-
-      if (error) {
-        throw error
-      }
-
+      if (error) throw error
       return data
     },
   })
-
-  return query
 }
 
 export function useInvalidateUserConnectionsQuery() {
   const queryClient = useQueryClient()
   const supabase = createClient()
-  const user = useRequiredUser()
+  const person = usePerson()
 
   useEffect(() => {
-    logger.info(
-      "[useInvalidateUserConnectionsQuery] Subscribing to user_connections channel",
-    )
-
+    if (!person.data) return
     const channel = supabase
-      .channel("user_connections")
+      .channel("connections")
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
-          table:
-            "user_connections" satisfies keyof Database["public"]["Tables"],
+          table: "connections" satisfies keyof Database["public"]["Tables"],
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: ["connections", user.id] })
+          queryClient.invalidateQueries({
+            queryKey: ["connections", person.data?.id],
+          })
         },
       )
       .subscribe((status, error) => {
-        if (error) {
-          logger.error(
-            "[useInvalidateUserConnectionsQuery] Error in channel",
-            error,
-          )
-        } else {
-          logger.info(
-            "[useInvalidateUserConnectionsQuery] Channel status",
-            status,
-          )
-        }
+        if (error) logger.error("[connections] subscription failed", error)
+        else logger.info("[connections] subscription", status)
       })
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [queryClient, supabase, user.id])
+  }, [person.data, queryClient, supabase])
 }

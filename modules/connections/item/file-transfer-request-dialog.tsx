@@ -24,7 +24,7 @@ type Props = {
   state: StateFrom<typeof connectionMachine>
   remoteUser: NonNullable<
     ReturnType<typeof useUserConnectionsQuery>["data"]
-  >[number]["user_1"]
+  >[number]["person_1"]
 }
 
 export function FileTransferRequestDialog({ send, state, remoteUser }: Props) {

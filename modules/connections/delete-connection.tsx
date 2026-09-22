@@ -1,3 +1,5 @@
+"use client"
+
 import { TrashIcon } from "lucide-react"
 
 import {
@@ -12,16 +14,12 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Button, buttonVariants } from "@/components/ui/button"
-import type { Tables, TablesInsert } from "@/supabase/types"
-import { createClient } from "@/utils/supabase/client"
 
-type Props = {
-  connection: Tables<"user_connections">
-}
+import { deleteConnection } from "./create/actions"
 
-export function DeleteConnection({ connection }: Props) {
-  const supabase = createClient()
+type Props = { remotePersonId: string }
 
+export function DeleteConnection({ remotePersonId }: Props) {
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
@@ -42,15 +40,7 @@ export function DeleteConnection({ connection }: Props) {
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            onClick={async () => {
-              await supabase
-                .from("user_connections")
-                .delete()
-                .match({
-                  user_1_id: connection.user_1_id,
-                  user_2_id: connection.user_2_id,
-                } satisfies TablesInsert<"user_connections">)
-            }}
+            onClick={() => deleteConnection(remotePersonId)}
             className={buttonVariants({ variant: "destructive" })}
           >
             Delete

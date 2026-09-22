@@ -12,9 +12,9 @@ type Props = {
 export async function Header({ user }: Props) {
   const supabase = await createClient()
   const { data: profile } = await supabase
-    .from("users")
+    .from("people")
     .select("animals(*),colors(*)")
-    .eq("id", user.id)
+    .eq("auth_user_id", user.id)
     .single()
 
   return (
