@@ -1,10 +1,6 @@
 import { expect, test } from "bun:test"
 import { subMinutes } from "date-fns"
 
-import {
-  CODE_EXPIRATION_MINUTES,
-  CODE_LENGTH,
-} from "@/modules/connections/create/constants"
 import { createAdminClient } from "@/utils/supabase/admin"
 
 import { appRouter } from "./router"
@@ -12,7 +8,7 @@ import { appRouter } from "./router"
 const integrationTest = process.env.RUN_DB_TESTS === "1" ? test : test.skip
 
 integrationTest(
-  "connection pairing creates and redeems only valid owned codes",
+  "connection pairing preserves purpose, expires after five minutes, and keeps the first redeemer",
   async () => {
     const admin = createAdminClient()
     const users = await Promise.all(
@@ -60,11 +56,9 @@ integrationTest(
       ).rejects.toMatchObject({ code: "UNAUTHORIZED" })
 
       const first = await owner.pairing.create()
-      expect(
-        new RegExp(`^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{${CODE_LENGTH}}$`).test(
-          first.code,
-        ),
-      ).toBe(true)
+      expect(/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/.test(first.code)).toBe(
+        true,
+      )
       const { data: firstRow, error: firstError } = await admin
         .from("pairing_codes")
         .select("person_id, purpose")
@@ -76,7 +70,7 @@ integrationTest(
         owner.pairing.redeem({ code: first.code }),
       ).rejects.toMatchObject({ code: "FORBIDDEN" })
 
-      const deviceCode = `D${crypto.randomUUID().slice(0, 12)}`
+      const deviceCode = `D${crypto.randomUUID().slice(0, 12)}`.toUpperCase()
       const { error: deviceError } = await admin.from("pairing_codes").insert({
         code: deviceCode,
         person_id: ownerId,
@@ -112,10 +106,7 @@ integrationTest(
       const { error: expireError } = await admin
         .from("pairing_codes")
         .update({
-          created_at: subMinutes(
-            new Date(),
-            CODE_EXPIRATION_MINUTES + 1,
-          ).toISOString(),
+          created_at: subMinutes(new Date(), 5.1).toISOString(),
         })
         .eq("code", second.code)
       if (expireError) throw expireError
@@ -124,27 +115,96 @@ integrationTest(
       ).rejects.toMatchObject({ code: "NOT_FOUND" })
 
       const active = await owner.pairing.create()
-      expect(await redeemer.pairing.redeem({ code: active.code })).toEqual({
-        remotePersonId: ownerId,
-      })
+      const alphabeticCode = `A${active.code.slice(1)}`
+      const { error: activeError } = await admin
+        .from("pairing_codes")
+        .update({
+          code: alphabeticCode,
+          created_at: subMinutes(new Date(), 4.9).toISOString(),
+        })
+        .eq("code", active.code)
+      if (activeError) throw activeError
+      expect(
+        await redeemer.pairing.redeem({
+          code: ` ${alphabeticCode.toLowerCase()} `,
+        }),
+      ).toEqual({ remotePersonId: ownerId })
       const { data: redemption, error: redemptionError } = await admin
         .from("pairing_code_redemptions")
-        .select("from_person_id")
-        .eq("code", active.code)
+        .select("from_person_id, created_at")
+        .eq("code", alphabeticCode)
         .single()
       if (redemptionError) throw redemptionError
       expect(redemption.from_person_id).toBe(redeemerId)
 
-      expect(await other.pairing.redeem({ code: active.code })).toEqual({
+      await expect(
+        other.pairing.redeem({ code: alphabeticCode }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" })
+      expect(await redeemer.pairing.redeem({ code: alphabeticCode })).toEqual({
         remotePersonId: ownerId,
       })
-      const { data: replaced, error: replacedError } = await admin
+      const { data: retried, error: retryError } = await admin
+        .from("pairing_code_redemptions")
+        .select("from_person_id, created_at")
+        .eq("code", alphabeticCode)
+        .single()
+      if (retryError) throw retryError
+      expect(retried).toEqual(redemption)
+
+      const { error: expireRetryError } = await admin
+        .from("pairing_codes")
+        .update({ created_at: subMinutes(new Date(), 5.1).toISOString() })
+        .eq("code", alphabeticCode)
+      if (expireRetryError) throw expireRetryError
+      await expect(
+        redeemer.pairing.redeem({ code: alphabeticCode }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" })
+
+      const concurrent = await owner.pairing.create()
+      const contenders = [
+        { caller: redeemer, personId: redeemerId },
+        { caller: other, personId: otherId },
+      ]
+      const attempts = await Promise.allSettled(
+        contenders.map(({ caller }) =>
+          caller.pairing.redeem({ code: concurrent.code }),
+        ),
+      )
+      expect(
+        attempts.filter(({ status }) => status === "fulfilled").length,
+      ).toBe(1)
+      expect(
+        attempts.filter(({ status }) => status === "rejected").length,
+      ).toBe(1)
+      const { data: winner, error: winnerError } = await admin
         .from("pairing_code_redemptions")
         .select("from_person_id")
-        .eq("code", active.code)
+        .eq("code", concurrent.code)
         .single()
-      if (replacedError) throw replacedError
-      expect(replaced.from_person_id).toBe(otherId)
+      if (winnerError) throw winnerError
+      for (const [index, attempt] of attempts.entries()) {
+        if (attempt.status === "fulfilled") {
+          expect(attempt.value).toEqual({ remotePersonId: ownerId })
+          expect(winner.from_person_id).toBe(contenders[index]!.personId)
+        } else {
+          expect(attempt.reason.code).toBe("FORBIDDEN")
+        }
+      }
+
+      const concurrentRetries = await owner.pairing.create()
+      expect(
+        await Promise.all(
+          Array.from({ length: 4 }, () =>
+            redeemer.pairing.redeem({ code: concurrentRetries.code }),
+          ),
+        ),
+      ).toEqual(Array.from({ length: 4 }, () => ({ remotePersonId: ownerId })))
+      const { data: retryRows, error: retryRowsError } = await admin
+        .from("pairing_code_redemptions")
+        .select("from_person_id")
+        .eq("code", concurrentRetries.code)
+      if (retryRowsError) throw retryRowsError
+      expect(retryRows).toEqual([{ from_person_id: redeemerId }])
     } finally {
       await Promise.all(
         users

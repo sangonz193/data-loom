@@ -44,7 +44,7 @@ export const appRouter = router({
       return data
     }),
     redeem: protectedProcedure
-      .input(z.object({ code: z.string().min(1).max(32) }))
+      .input(z.object({ code: z.string().trim().min(1).max(32).toUpperCase() }))
       .mutation(async ({ ctx, input }) => {
         const admin = createAdminClient()
         const { data: person, error: personError } = await admin
@@ -72,8 +72,21 @@ export const appRouter = router({
 
         const { error: redemptionError } = await admin
           .from("pairing_code_redemptions")
-          .upsert({ code: pairingCode.code, from_person_id: person.id })
+          .upsert(
+            { code: pairingCode.code, from_person_id: person.id },
+            { onConflict: "code", ignoreDuplicates: true },
+          )
         if (redemptionError) throw redemptionError
+
+        const { data: redemption, error: existingError } = await admin
+          .from("pairing_code_redemptions")
+          .select("from_person_id")
+          .eq("code", pairingCode.code)
+          .maybeSingle()
+        if (existingError) throw existingError
+        if (!redemption) throw new TRPCError({ code: "NOT_FOUND" })
+        if (redemption.from_person_id !== person.id)
+          throw new TRPCError({ code: "FORBIDDEN" })
 
         return { remotePersonId: pairingCode.person_id }
       }),
