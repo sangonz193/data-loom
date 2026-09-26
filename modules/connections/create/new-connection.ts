@@ -1,15 +1,12 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js"
+import type { TRPCClient } from "@trpc/client"
 import { assign, fromCallback, fromPromise, setup } from "xstate"
 
 import { logger } from "@/logger"
+import type { AppRouter } from "@/modules/api/router"
 import type { Database } from "@/supabase/types"
 
-import {
-  createConnection,
-  createPairingCode,
-  notifyPairingCodeRedeemed,
-  redeemPairingCode,
-} from "./actions"
+import { createConnection, notifyPairingCodeRedeemed } from "./actions"
 import type { CallerOutputEvent } from "../connect-caller-peer"
 import { connectCallerPeerMachine } from "../connect-caller-peer"
 import type { ReceiverOutputEvent } from "../connect-receiver-peer"
@@ -19,10 +16,13 @@ type Input = {
   supabase: SupabaseClient<Database>
   currentUser: User
   deviceId: string
+  trpcClient: TRPCClient<AppRouter>
 }
 
 interface Context extends Input {
-  createdCode?: Awaited<ReturnType<typeof createPairingCode>>
+  createdCode?: Awaited<
+    ReturnType<TRPCClient<AppRouter>["pairing"]["create"]["mutate"]>
+  >
   redeemCode?: string
   remoteUserId?: string
   peerConnection?: RTCPeerConnection
@@ -63,10 +63,8 @@ export const newConnectionMachine = setup({
 
   actions: {
     setCreatedCodeToContext: assign({
-      createdCode: (
-        _,
-        pairingCode: Awaited<ReturnType<typeof createPairingCode>>,
-      ) => pairingCode,
+      createdCode: (_, pairingCode: NonNullable<Context["createdCode"]>) =>
+        pairingCode,
     }),
     setRedeemCodeToContext: assign({
       redeemCode: (_, redeemCode: string) => redeemCode,
@@ -89,7 +87,9 @@ export const newConnectionMachine = setup({
   actors: {
     connectCallerPeerMachine,
     connectReceiverPeerMachine,
-    createCode: fromPromise(() => createPairingCode()),
+    createCode: fromPromise(({ input }: { input: Context }) =>
+      input.trpcClient.pairing.create.mutate(),
+    ),
     listenForRedemptions: fromCallback<{ type: "noop" }, Context>((params) => {
       const sendBack = params.sendBack as (event: Event) => void
       const { supabase, createdCode, deviceId } = params.input
@@ -136,7 +136,7 @@ export const newConnectionMachine = setup({
       },
     ),
     redeemCode: fromPromise(({ input }: { input: Context }) =>
-      redeemPairingCode(input.redeemCode!),
+      input.trpcClient.pairing.redeem.mutate({ code: input.redeemCode! }),
     ),
     notifyPairingOwner: fromPromise(({ input }: { input: Context }) =>
       notifyPairingCodeRedeemed(input.redeemCode!),
@@ -178,6 +178,7 @@ export const newConnectionMachine = setup({
     "creating code": {
       invoke: {
         src: "createCode",
+        input: ({ context }) => context,
         onDone: {
           target: "listening for redemptions",
           actions: {
