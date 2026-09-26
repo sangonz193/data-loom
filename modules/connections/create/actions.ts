@@ -31,7 +31,7 @@ async function currentPerson() {
 }
 
 export async function notifyPairingCodeRedeemed(codeInput: string) {
-  const code = z.string().min(1).max(32).parse(codeInput)
+  const code = z.string().trim().min(1).max(32).toUpperCase().parse(codeInput)
   const person = await currentPerson()
   const admin = createAdminClient()
   const { data: redemption, error: redemptionError } = await admin

@@ -54,8 +54,10 @@ export function Idle({ state, send }: Props) {
           <Input
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            inputMode="numeric"
-            autoCapitalize="off"
+            inputMode="text"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
             className="shrink rounded-r-none"
           />
 

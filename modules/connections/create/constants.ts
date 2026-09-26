@@ -1,2 +1,2 @@
-export const CODE_LENGTH = 4
-export const CODE_EXPIRATION_MINUTES = 10
+export const CODE_LENGTH = 8
+export const CODE_EXPIRATION_MINUTES = 5
