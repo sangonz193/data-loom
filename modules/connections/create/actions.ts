@@ -6,7 +6,6 @@ import { z } from "zod"
 import { createAdminClient } from "@/utils/supabase/admin"
 import { createClient } from "@/utils/supabase/server"
 
-import { canCreateConnection } from "./connection-authorization"
 import { canonicalConnectionIds } from "./connection-ids"
 import { CODE_EXPIRATION_MINUTES } from "./constants"
 import { canSendSignal } from "./signal-authorization"
@@ -28,73 +27,6 @@ async function currentPerson() {
     .single()
   if (error || !person) throw error ?? new Error("Person not found")
   return person
-}
-
-export async function notifyPairingCodeRedeemed(codeInput: string) {
-  const code = z.string().trim().min(1).max(32).toUpperCase().parse(codeInput)
-  const person = await currentPerson()
-  const admin = createAdminClient()
-  const { data: redemption, error: redemptionError } = await admin
-    .from("pairing_code_redemptions")
-    .select("code, pairing_codes!inner(person_id, purpose)")
-    .match({ code, from_person_id: person.id })
-    .eq("pairing_codes.purpose", "connection")
-    .single()
-  if (redemptionError || !redemption)
-    throw redemptionError ?? new Error("Pairing code redemption not found")
-
-  const pairingCode = redemption.pairing_codes
-
-  const { data: devices, error: devicesError } = await admin
-    .from("devices")
-    .select("id")
-    .eq("person_id", pairingCode.person_id)
-  if (devicesError) throw devicesError
-  await Promise.all(
-    devices.map((device) =>
-      admin.channel(`device:${device.id}`, { config: { private: true } }).send({
-        type: "broadcast",
-        event: "pairing-redemption",
-        payload: { remotePersonId: person.id, code },
-      }),
-    ),
-  )
-}
-
-export async function createConnection(remotePersonIdInput: string) {
-  const remotePersonId = uuid.parse(remotePersonIdInput)
-  const person = await currentPerson()
-  const admin = createAdminClient()
-  const { data: redemptions, error: redemptionError } = await admin
-    .from("pairing_code_redemptions")
-    .select(
-      "from_person_id, pairing_codes!inner(person_id, purpose, created_at)",
-    )
-    .eq("pairing_codes.purpose", "connection")
-    .gte(
-      "pairing_codes.created_at",
-      subMinutes(new Date(), CODE_EXPIRATION_MINUTES).toISOString(),
-    )
-  if (redemptionError) throw redemptionError
-  const redeemedTogether = canCreateConnection({
-    personId: person.id,
-    remotePersonId,
-    pairingRedemptions: redemptions.map((redemption) => ({
-      fromPersonId: redemption.from_person_id,
-      codePersonId: redemption.pairing_codes.person_id,
-      codeCreatedAt: redemption.pairing_codes.created_at,
-    })),
-  })
-  if (!redeemedTogether) throw new Error("Pairing code redemption not found")
-
-  const [person_1_id, person_2_id] = canonicalConnectionIds(
-    person.id,
-    remotePersonId,
-  )
-  const { error } = await admin
-    .from("connections")
-    .upsert({ person_1_id, person_2_id })
-  if (error) throw error
 }
 
 export async function registerDevice(deviceIdInput: string) {

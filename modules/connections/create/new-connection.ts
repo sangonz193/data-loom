@@ -6,7 +6,6 @@ import { logger } from "@/logger"
 import type { AppRouter } from "@/modules/api/router"
 import type { Database } from "@/supabase/types"
 
-import { createConnection, notifyPairingCodeRedeemed } from "./actions"
 import type { CallerOutputEvent } from "../connect-caller-peer"
 import { connectCallerPeerMachine } from "../connect-caller-peer"
 import type { ReceiverOutputEvent } from "../connect-receiver-peer"
@@ -130,16 +129,18 @@ export const newConnectionMachine = setup({
         supabase.removeChannel(channel)
       }
     }),
-    createUserConnection: fromPromise<void, Context>(
-      async ({ input: { remoteUserId } }) => {
-        await createConnection(remoteUserId!)
-      },
+    createUserConnection: fromPromise(({ input }: { input: Context }) =>
+      input.trpcClient.connections.create.mutate({
+        remotePersonId: input.remoteUserId!,
+      }),
     ),
     redeemCode: fromPromise(({ input }: { input: Context }) =>
       input.trpcClient.pairing.redeem.mutate({ code: input.redeemCode! }),
     ),
     notifyPairingOwner: fromPromise(({ input }: { input: Context }) =>
-      notifyPairingCodeRedeemed(input.redeemCode!),
+      input.trpcClient.pairing.notifyRedeemed.mutate({
+        code: input.redeemCode!,
+      }),
     ),
     cleanup: fromCallback(({ input }: { input: Context }) => {
       return () => {
