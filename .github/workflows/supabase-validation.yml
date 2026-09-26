@@ -8,6 +8,10 @@ on:
       - app/api/trpc/**
       - modules/connections/delete-connection.tsx
       - modules/connections/create/connection-ids.ts
+      - modules/connections/create/actions.ts
+      - modules/connections/create/constants.ts
+      - modules/connections/create/new-connection.ts
+      - modules/connections/create/dialog/create-connection-dialog.tsx
       - utils/supabase/**
       - package.json
       - bun.lock
@@ -32,7 +36,7 @@ jobs:
       - run: bunx --no-install supabase db query --local --file supabase/tests/legacy-connections-assertion.sql
       - run: bunx --no-install supabase db query --local --file supabase/tests/people-identity-assertion.sql
       - run: bunx --no-install supabase db reset
-      - name: Test API ownership against local database
+      - name: Configure local API tests
         run: |
           status_json=$(bunx --no-install supabase status -o json)
           {
@@ -42,6 +46,6 @@ jobs:
             echo "SUPABASE_JWT_SECRET=$(jq -r '.JWT_SECRET' <<< "$status_json")"
             echo "RUN_DB_TESTS=1"
           } >> "$GITHUB_ENV"
-      - run: bun test modules/api/router.integration.test.ts
+      - run: bun test modules/api/*.integration.test.ts
       - if: always()
         run: bunx --no-install supabase stop

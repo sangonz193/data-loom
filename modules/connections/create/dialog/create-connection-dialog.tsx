@@ -12,6 +12,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Spinner } from "@/components/ui/spinner"
+import { useTRPCClient } from "@/modules/api/client"
 import { useRequiredUser } from "@/modules/auth/use-user"
 import { useDevice } from "@/modules/connections/use-device"
 import { createClient } from "@/utils/supabase/client"
@@ -55,11 +56,13 @@ function Content() {
 function MachineContent({ deviceId }: { deviceId: string }) {
   const user = useRequiredUser()
   const supabase = createClient()
+  const trpcClient = useTRPCClient()
   const [state, send] = useMachine(newConnectionMachine, {
     input: {
       supabase,
       currentUser: user,
       deviceId,
+      trpcClient,
     },
   })
 

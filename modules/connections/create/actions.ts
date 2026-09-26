@@ -8,7 +8,7 @@ import { createClient } from "@/utils/supabase/server"
 
 import { canCreateConnection } from "./connection-authorization"
 import { canonicalConnectionIds } from "./connection-ids"
-import { CODE_EXPIRATION_MINUTES, CODE_LENGTH } from "./constants"
+import { CODE_EXPIRATION_MINUTES } from "./constants"
 import { canSendSignal } from "./signal-authorization"
 
 const uuid = z.string().uuid()
@@ -28,55 +28,6 @@ async function currentPerson() {
     .single()
   if (error || !person) throw error ?? new Error("Person not found")
   return person
-}
-
-export async function createPairingCode() {
-  const person = await currentPerson()
-  const admin = createAdminClient()
-  const { error: deleteError } = await admin
-    .from("pairing_codes")
-    .delete()
-    .match({ person_id: person.id, purpose: "connection" })
-  if (deleteError) throw deleteError
-
-  const { data, error } = await admin
-    .from("pairing_codes")
-    .insert({
-      code: getRandomCode(),
-      person_id: person.id,
-      purpose: "connection",
-    })
-    .select("code, created_at")
-    .single()
-  if (error) throw error
-  return data
-}
-
-export async function redeemPairingCode(codeInput: string) {
-  const code = z.string().min(1).max(32).parse(codeInput)
-  const person = await currentPerson()
-  const admin = createAdminClient()
-  const { data: pairingCode, error } = await admin
-    .from("pairing_codes")
-    .select("code, person_id, purpose")
-    .eq("code", code)
-    .eq("purpose", "connection")
-    .gte(
-      "created_at",
-      subMinutes(new Date(), CODE_EXPIRATION_MINUTES).toISOString(),
-    )
-    .single()
-  if (error || !pairingCode) throw error ?? new Error("Pairing code not found")
-  if (pairingCode.person_id === person.id) {
-    throw new Error("Cannot redeem your own code")
-  }
-
-  const { error: redemptionError } = await admin
-    .from("pairing_code_redemptions")
-    .upsert({ code: pairingCode.code, from_person_id: person.id })
-  if (redemptionError) throw redemptionError
-
-  return { remotePersonId: pairingCode.person_id }
 }
 
 export async function notifyPairingCodeRedeemed(codeInput: string) {
@@ -312,13 +263,5 @@ export async function sendSignal(input: {
         payload: { fromPersonId: person.id, payload: input.payload },
       }),
     ),
-  )
-}
-
-function getRandomCode() {
-  const alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
-  const values = crypto.getRandomValues(new Uint32Array(CODE_LENGTH))
-  return Array.from(values, (value) => alphabet[value % alphabet.length]).join(
-    "",
   )
 }
