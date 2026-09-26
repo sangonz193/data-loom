@@ -45,3 +45,36 @@ test("allows a fresh pairing redemption", () => {
     }),
   ).toBe(true)
 })
+
+test("allows either redemption direction but rejects an unrelated owner", () => {
+  const redemption = {
+    fromPersonId: "person-a",
+    codePersonId: "person-b",
+    codeCreatedAt: now.toISOString(),
+  }
+
+  expect(
+    canCreateConnection({
+      personId: "person-a",
+      remotePersonId: "person-b",
+      pairingRedemptions: [redemption],
+      now,
+    }),
+  ).toBe(true)
+  expect(
+    canCreateConnection({
+      personId: "person-b",
+      remotePersonId: "person-a",
+      pairingRedemptions: [redemption],
+      now,
+    }),
+  ).toBe(true)
+  expect(
+    canCreateConnection({
+      personId: "person-a",
+      remotePersonId: "person-c",
+      pairingRedemptions: [redemption],
+      now,
+    }),
+  ).toBe(false)
+})
