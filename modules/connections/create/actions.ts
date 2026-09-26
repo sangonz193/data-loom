@@ -146,20 +146,6 @@ export async function createConnection(remotePersonIdInput: string) {
   if (error) throw error
 }
 
-export async function deleteConnection(remotePersonIdInput: string) {
-  const remotePersonId = uuid.parse(remotePersonIdInput)
-  const person = await currentPerson()
-  const [person_1_id, person_2_id] = canonicalConnectionIds(
-    person.id,
-    remotePersonId,
-  )
-  const { error } = await createAdminClient()
-    .from("connections")
-    .delete()
-    .match({ person_1_id, person_2_id })
-  if (error) throw error
-}
-
 export async function registerDevice(deviceIdInput: string) {
   const id = uuid.parse(deviceIdInput)
   const person = await currentPerson()

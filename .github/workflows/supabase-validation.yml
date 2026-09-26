@@ -4,6 +4,11 @@ on:
   pull_request:
     paths:
       - supabase/**
+      - modules/api/**
+      - app/api/trpc/**
+      - modules/connections/delete-connection.tsx
+      - modules/connections/create/connection-ids.ts
+      - utils/supabase/**
       - package.json
       - bun.lock
       - .github/workflows/supabase-validation.yml
@@ -26,5 +31,17 @@ jobs:
       - run: bunx --no-install supabase migration up --local
       - run: bunx --no-install supabase db query --local --file supabase/tests/legacy-connections-assertion.sql
       - run: bunx --no-install supabase db query --local --file supabase/tests/people-identity-assertion.sql
+      - run: bunx --no-install supabase db reset
+      - name: Test API ownership against local database
+        run: |
+          status_json=$(bunx --no-install supabase status -o json)
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$(jq -r '.API_URL' <<< "$status_json")"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$(jq -r '.PUBLISHABLE_KEY' <<< "$status_json")"
+            echo "SUPABASE_SECRET_KEY=$(jq -r '.SECRET_KEY' <<< "$status_json")"
+            echo "SUPABASE_JWT_SECRET=$(jq -r '.JWT_SECRET' <<< "$status_json")"
+            echo "RUN_DB_TESTS=1"
+          } >> "$GITHUB_ENV"
+      - run: bun test modules/api/router.integration.test.ts
       - if: always()
         run: bunx --no-install supabase stop
