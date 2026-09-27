@@ -192,7 +192,7 @@ integrationTest(
         payload: offer,
       })
 
-      const code = (await owner.pairing.create()).code
+      const code = (await owner.pairing.create({ purpose: "connection" })).code
       await redeemer.pairing.redeem({ code })
       await expect(third.pairing.redeem({ code })).rejects.toMatchObject({
         code: "FORBIDDEN",

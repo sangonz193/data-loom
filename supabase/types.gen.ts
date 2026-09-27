@@ -363,6 +363,15 @@ export type Database = {
           id: string
         }[]
       }
+      complete_device_link: {
+        Args: {
+          link_code: string
+          min_created_at: string
+          source_device_id: string
+          target_auth_user_id: string
+        }
+        Returns: undefined
+      }
       current_person_id: { Args: never; Returns: string }
       people_are_connected: {
         Args: { other_person_id: string }
