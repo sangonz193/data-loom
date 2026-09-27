@@ -4,6 +4,7 @@ import { useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { useTRPCClient } from "@/modules/api/client"
+import { setupLinkUrl } from "@/modules/auth/device-link/setup-link"
 import { DisplayCode } from "@/modules/connections/create/dialog/display-code"
 
 export function AddDevice({ email }: { email: string | undefined }) {
@@ -44,6 +45,7 @@ export function AddDevice({ email }: { email: string | undefined }) {
           createdAt={code.created_at}
           heading="Your setup code is:"
           instruction="Enter this code on the browser you want to link."
+          qrValue={setupLinkUrl(location.origin, code.code, email)}
         />
       )}
       {error && <p role="alert">{error}</p>}

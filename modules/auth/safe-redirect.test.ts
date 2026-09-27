@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 
-import { safeRedirect } from "./safe-redirect"
+import { safeRedirect, withCurrentFragment } from "./safe-redirect"
 
 test("accepts local paths and preserves query and fragment", () => {
   for (const path of [
@@ -15,6 +15,21 @@ test("accepts local paths and preserves query and fragment", () => {
       "https://app.test",
     )
   }
+})
+
+test("forwards the browser fragment through anonymous sign-in", () => {
+  expect(withCurrentFragment("/link-device", "#setup=ABCDEFGH")).toBe(
+    "/link-device#setup=ABCDEFGH",
+  )
+  expect(withCurrentFragment("/link-device#existing", "#setup=ABCDEFGH")).toBe(
+    "/link-device#existing",
+  )
+  expect(
+    new URL(
+      withCurrentFragment("/link-device", "#//evil.test"),
+      "https://app.test",
+    ).origin,
+  ).toBe("https://app.test")
 })
 
 test("rejects external URLs and browser authority normalization", () => {

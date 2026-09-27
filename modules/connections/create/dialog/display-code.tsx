@@ -7,6 +7,7 @@ import {
   type Duration,
 } from "date-fns"
 import { CheckIcon, CopyIcon } from "lucide-react"
+import { QRCodeSVG } from "qrcode.react"
 import { useEffect, useMemo, useState } from "react"
 
 import { Button } from "@/components/ui/button"
@@ -19,6 +20,7 @@ type Props = {
   createdAt: string
   heading?: string
   instruction?: string
+  qrValue?: string
 }
 
 export function DisplayCode(props: Props) {
@@ -92,6 +94,24 @@ export function DisplayCode(props: Props) {
           <Icon className="size-5" />
         </Button>
       </div>
+
+      {props.qrValue && !isExpired && (
+        <div className="flex flex-col items-center gap-2">
+          <QRCodeSVG
+            value={props.qrValue}
+            size={192}
+            marginSize={4}
+            level="M"
+            bgColor="#FFFFFF"
+            fgColor="#000000"
+            title="Scan to open device setup"
+          />
+          <p className="text-center text-sm">
+            Scan with your phone camera to open setup in its default browser. To
+            link a different browser, type the code there.
+          </p>
+        </div>
+      )}
 
       <ExpNotice
         duration={duration}

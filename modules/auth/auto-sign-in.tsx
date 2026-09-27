@@ -7,6 +7,7 @@ import { createClient } from "@/utils/supabase/client"
 
 import { ensureSession } from "./anonymous-sign-in"
 import { authTransitions, runAuthTransition } from "./auth-transition"
+import { withCurrentFragment } from "./safe-redirect"
 
 export function AutoSignIn({ destination }: { destination: string }) {
   const started = useRef(false)
@@ -17,7 +18,9 @@ export function AutoSignIn({ destination }: { destination: string }) {
     started.current = true
     void runAuthTransition(async () => {
       await ensureSession(createClient().auth)
-      await authTransitions.navigate(destination)
+      await authTransitions.navigate(
+        withCurrentFragment(destination, location.hash),
+      )
     }).catch((error: Error) => setError(error.message))
   }, [destination])
 
