@@ -1,7 +1,9 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js"
+import type { TRPCClient } from "@trpc/client"
 import { assign, sendTo, setup, sendParent } from "xstate"
 
 import { logger } from "@/logger"
+import type { AppRouter } from "@/modules/api/router"
 import type { Database } from "@/supabase/types"
 
 import { cleanUpSignalingRowsActor } from "./clean-up-signaling-rows"
@@ -10,7 +12,6 @@ import type {
   ConnectPeerOutputEvent,
 } from "./connect-peer"
 import { connectPeer } from "./connect-peer"
-import { sendSignal } from "./create/actions"
 import type { WebRtcSignalsOutputEvent } from "./web-rtc-signals"
 import { webRtcSignals } from "./web-rtc-signals"
 
@@ -20,6 +21,7 @@ type Input = {
   currentUser: User
   remoteUserId: string
   deviceId: string
+  trpcClient: TRPCClient<AppRouter>
 }
 
 type Context = Input & {
@@ -60,22 +62,44 @@ export const connectCallerPeerMachine = setup({
     saveAnswerToContext: assign({
       answer: (_, answer: RTCSessionDescriptionInit) => answer,
     }),
-    sendOffer: async (
-      { context: { remoteUserId } },
+    sendOffer: (
+      { context: { remoteUserId, trpcClient }, self },
       offer: RTCSessionDescriptionInit,
     ) => {
       logger.info("[connectCallerPeerMachine] sending offer", offer)
-      await sendSignal({ toPersonId: remoteUserId, payload: offer })
+      trpcClient.signals.send
+        .mutate({
+          toPersonId: remoteUserId,
+          payload: offer as { type: "offer"; sdp: string },
+        })
+        .catch((error) => {
+          logger.error("[connectCallerPeerMachine] sendOffer error", error)
+          self.send({
+            type: "peer-connection.failed",
+            error: { type: "unknown" },
+          })
+        })
     },
-    sendIceCandidate: async (
-      { context: { remoteUserId } },
+    sendIceCandidate: (
+      { context: { remoteUserId, trpcClient }, self },
       candidate: RTCIceCandidate,
     ) => {
       logger.info("[connectCallerPeerMachine] sending ice candidate", candidate)
-      await sendSignal({
-        toPersonId: remoteUserId,
-        payload: candidate.toJSON(),
-      })
+      trpcClient.signals.send
+        .mutate({
+          toPersonId: remoteUserId,
+          payload: { ...candidate.toJSON(), candidate: candidate.candidate },
+        })
+        .catch((error) => {
+          logger.error(
+            "[connectCallerPeerMachine] sendIceCandidate error",
+            error,
+          )
+          self.send({
+            type: "peer-connection.failed",
+            error: { type: "unknown" },
+          })
+        })
     },
     savePendingIceCandidate: assign({
       pendingIceCandidates: (
@@ -85,25 +109,33 @@ export const connectCallerPeerMachine = setup({
     }),
     sendPendingIceCandidates: assign({
       pendingIceCandidates: ({
-        context: { pendingIceCandidates, remoteUserId },
+        context: { pendingIceCandidates, remoteUserId, trpcClient },
+        self,
       }) => {
         logger.info(
           "[connectCallerPeerMachine] sending pending ice candidates",
           pendingIceCandidates.length,
         )
-        Promise.all(
-          pendingIceCandidates.map((candidate) =>
-            sendSignal({
+        for (const candidate of pendingIceCandidates) {
+          trpcClient.signals.send
+            .mutate({
               toPersonId: remoteUserId,
-              payload: candidate.toJSON(),
-            }),
-          ),
-        ).catch((error) =>
-          logger.error(
-            "[connectCallerPeerMachine] sendPendingIceCandidates error",
-            error,
-          ),
-        )
+              payload: {
+                ...candidate.toJSON(),
+                candidate: candidate.candidate,
+              },
+            })
+            .catch((error) => {
+              logger.error(
+                "[connectCallerPeerMachine] sendPendingIceCandidates error",
+                error,
+              )
+              self.send({
+                type: "peer-connection.failed",
+                error: { type: "unknown" },
+              })
+            })
+        }
 
         return []
       },

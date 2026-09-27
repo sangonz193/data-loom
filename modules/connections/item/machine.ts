@@ -18,7 +18,9 @@ import { createClient } from "@/utils/supabase/client"
 
 import { receiveFileActor } from "../../data-transfer/receive-file"
 import { sendFileActor } from "../../data-transfer/send-file"
+import type { CallerOutputEvent } from "../connect-caller-peer"
 import { connectCallerPeerMachine } from "../connect-caller-peer"
+import type { ReceiverOutputEvent } from "../connect-receiver-peer"
 import { connectReceiverPeerMachine } from "../connect-receiver-peer"
 import type { ListenToFileRequestResponseTableOutputEvent } from "../file-sharing-requests/listen-to-file-request-response-table"
 import { listenToFileRequestResponseTable } from "../file-sharing-requests/listen-to-file-request-response-table"
@@ -44,6 +46,8 @@ interface Context extends Input {
 }
 
 type Event =
+  | CallerOutputEvent
+  | ReceiverOutputEvent
   | PeerConnectionEventsOutputEvents
   | ListenToFileRequestResponseTableOutputEvent
   | { type: "send-files"; files: File[] }
@@ -292,6 +296,12 @@ export const connectionMachine = setup({
           target: "sending files",
         },
       },
+      on: {
+        "peer-connection.failed": {
+          target: "idle",
+          actions: ["closePeerConnection", "clearLastTransfer"],
+        },
+      },
     },
 
     "files sent": {
@@ -337,6 +347,10 @@ export const connectionMachine = setup({
       },
 
       on: {
+        "peer-connection.failed": {
+          target: "idle",
+          actions: ["closePeerConnection", "clearLastTransfer"],
+        },
         "peer.datachannel": {
           target: "receiving files",
 

@@ -12,10 +12,87 @@ import { createAdminClient } from "@/utils/supabase/admin"
 
 import { getConnectionRedemptions } from "./connection-redemptions"
 import { sendPairingRedemption } from "./pairing-redemption-delivery"
+import { sendSignalBroadcast } from "./signal-delivery"
 import { protectedProcedure, router } from "./trpc"
 import { canonicalConnectionIds } from "../connections/create/connection-ids"
+import { canSendSignal } from "../connections/create/signal-authorization"
+
+const signalPayload = z.union([
+  z.object({ type: z.literal("offer"), sdp: z.string() }).strict(),
+  z.object({ type: z.literal("answer"), sdp: z.string() }).strict(),
+  z
+    .object({
+      candidate: z.string(),
+      sdpMid: z.string().nullable().optional(),
+      sdpMLineIndex: z.number().int().nonnegative().nullable().optional(),
+      usernameFragment: z.string().nullable().optional(),
+    })
+    .strict(),
+])
 
 export const appRouter = router({
+  signals: router({
+    send: protectedProcedure
+      .input(z.object({ toPersonId: z.uuid(), payload: signalPayload }))
+      .mutation(async ({ ctx, input }) => {
+        const admin = createAdminClient()
+        const { data: person, error: personError } = await admin
+          .from("people")
+          .select("id")
+          .eq("auth_user_id", ctx.userId)
+          .maybeSingle()
+        if (personError) throw personError
+        if (!person) throw new TRPCError({ code: "FORBIDDEN" })
+
+        const [person_1_id, person_2_id] = canonicalConnectionIds(
+          person.id,
+          input.toPersonId,
+        )
+        const { data: connection, error: connectionError } = await admin
+          .from("connections")
+          .select("person_1_id")
+          .match({ person_1_id, person_2_id })
+          .maybeSingle()
+        if (connectionError) throw connectionError
+
+        let freshPairingRedemptions: {
+          fromPersonId: string
+          codePersonId: string
+        }[] = []
+        if (!connection && person.id !== input.toPersonId) {
+          const { data: redemptions, error } = await getConnectionRedemptions(
+            admin,
+            person.id,
+            input.toPersonId,
+          )
+          if (error) throw error
+          freshPairingRedemptions = redemptions.map((redemption) => ({
+            fromPersonId: redemption.from_person_id,
+            codePersonId: redemption.pairing_codes.person_id,
+          }))
+        }
+        if (
+          !canSendSignal({
+            hasConnection: !!connection,
+            fromPersonId: person.id,
+            toPersonId: input.toPersonId,
+            freshPairingRedemptions,
+          })
+        )
+          throw new TRPCError({ code: "FORBIDDEN" })
+
+        const { data: devices, error: devicesError } = await admin
+          .from("devices")
+          .select("id")
+          .eq("person_id", input.toPersonId)
+        if (devicesError) throw devicesError
+        await sendSignalBroadcast(
+          admin,
+          devices.map((device) => device.id),
+          { fromPersonId: person.id, payload: input.payload },
+        )
+      }),
+  }),
   shares: router({
     request: protectedProcedure
       .input(
