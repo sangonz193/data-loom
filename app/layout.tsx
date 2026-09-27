@@ -7,6 +7,7 @@ import type { PropsWithChildren } from "react"
 
 import { Footer } from "@/components/footer"
 import { cn } from "@/lib/cn"
+import { DeviceLinkProvider } from "@/modules/auth/device-link/provider"
 import { AuthProvider } from "@/modules/auth/provider/server"
 import { themeClassNames } from "@/styles/themeClasses"
 import type { Tables } from "@/supabase/types"
@@ -51,7 +52,9 @@ export default async function RootLayout({ children }: PropsWithChildren) {
         <main className="min-h-screen bg-background">
           {process.env.NODE_ENV === "production" && <Analytics />}
           <ReactQueryProvider>
-            <AuthProvider>{children}</AuthProvider>
+            <DeviceLinkProvider>
+              <AuthProvider>{children}</AuthProvider>
+            </DeviceLinkProvider>
           </ReactQueryProvider>
         </main>
 

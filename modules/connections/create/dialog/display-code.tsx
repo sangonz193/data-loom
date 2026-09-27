@@ -17,6 +17,8 @@ import { CODE_EXPIRATION_MINUTES } from "../constants"
 type Props = {
   code: string
   createdAt: string
+  heading?: string
+  instruction?: string
 }
 
 export function DisplayCode(props: Props) {
@@ -62,7 +64,7 @@ export function DisplayCode(props: Props) {
           isExpired && "opacity-30",
         )}
       >
-        Your connection code is:
+        {props.heading ?? "Your connection code is:"}
       </span>
       <div
         className={cn(
@@ -91,7 +93,11 @@ export function DisplayCode(props: Props) {
         </Button>
       </div>
 
-      <ExpNotice duration={duration} isExpired={isExpired} />
+      <ExpNotice
+        duration={duration}
+        isExpired={isExpired}
+        instruction={props.instruction}
+      />
     </div>
   )
 }
@@ -99,9 +105,11 @@ export function DisplayCode(props: Props) {
 function ExpNotice({
   duration,
   isExpired,
+  instruction,
 }: {
   duration: Duration
   isExpired: boolean
+  instruction?: string
 }) {
   if (isExpired) {
     return (
@@ -113,8 +121,8 @@ function ExpNotice({
 
   return (
     <span className="mt-4 whitespace-pre-wrap text-sm text-popover-foreground/60">
-      Enter this code on the other device to connect.{"\n"}The code will expire
-      in{" "}
+      {instruction ?? "Enter this code on the other device to connect."}
+      {"\n"}The code will expire in{" "}
       <span className="text-foreground">
         {isExpired ? "0 seconds" : formatDuration(duration)}
       </span>

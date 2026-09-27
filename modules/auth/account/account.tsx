@@ -10,6 +10,7 @@ import { createClient } from "@/utils/supabase/client"
 
 import { authTransitions, runAuthTransition } from "../auth-transition"
 import { useUser } from "../use-user"
+import { AddDevice } from "./add-device"
 
 export function Account({ confirmation }: { confirmation?: string }) {
   const user = useUser()
@@ -201,6 +202,7 @@ export function Account({ confirmation }: { confirmation?: string }) {
           >
             Sign out of this browser
           </Button>
+          <AddDevice email={user.email} />
         </section>
       : <section
           className="flex flex-col gap-4"
@@ -216,6 +218,9 @@ export function Account({ confirmation }: { confirmation?: string }) {
               no longer be available in this browser.
             </p>
           )}
+          <Link href="/link-device" className="underline">
+            Link this browser to an existing account
+          </Link>
           <form
             className="flex flex-col gap-3"
             aria-describedby={
