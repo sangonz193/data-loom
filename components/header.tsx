@@ -1,4 +1,5 @@
 import type { User } from "@supabase/supabase-js"
+import Link from "next/link"
 
 import { createClient } from "@/utils/supabase/server"
 
@@ -34,7 +35,13 @@ export async function Header({ user }: Props) {
         <span className="text-xs">(You)</span>
       </span>
 
-      <HeaderCreateConnection className="ml-auto" />
+      <Link
+        href="/account"
+        className="ml-auto max-w-40 truncate text-sm underline"
+      >
+        {user.is_anonymous ? "Add a login" : user.email || "Account"}
+      </Link>
+      <HeaderCreateConnection />
     </div>
   )
 }

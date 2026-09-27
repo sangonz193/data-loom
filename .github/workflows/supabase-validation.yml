@@ -5,6 +5,11 @@ on:
     paths:
       - supabase/**
       - modules/api/**
+      - modules/auth/**
+      - app/account/**
+      - app/auth/**
+      - app/auto-login/**
+      - components/header.tsx
       - app/api/trpc/**
       - modules/connections/delete-connection.tsx
       - modules/connections/create/connection-ids.ts
@@ -53,8 +58,9 @@ jobs:
             echo "SUPABASE_SECRET_KEY=$(jq -r '.SECRET_KEY' <<< "$status_json")"
             echo "SUPABASE_JWT_SECRET=$(jq -r '.JWT_SECRET' <<< "$status_json")"
             echo "DB_URL=$(jq -r '.DB_URL' <<< "$status_json")"
+            echo "MAILPIT_URL=$(jq -er '.MAILPIT_URL // .INBUCKET_URL' <<< "$status_json")"
             echo "RUN_DB_TESTS=1"
           } >> "$GITHUB_ENV"
-      - run: bun test modules/api/*.integration.test.ts
+      - run: bun test modules/api/*.integration.test.ts modules/auth
       - if: always()
         run: bunx --no-install supabase stop
