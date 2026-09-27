@@ -506,7 +506,7 @@ integrationTest(
           ...responseInput,
           requestId: expiredRequest.id,
         }),
-      ).rejects.toMatchObject({ code: "NOT_FOUND" })
+      ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" })
 
       const { data: responses, error: responsesError } = await admin
         .from("share_request_responses")

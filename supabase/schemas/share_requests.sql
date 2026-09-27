@@ -5,6 +5,7 @@ create table public.share_requests (
   to_person_id uuid not null references public.people (id) on delete cascade,
   payload jsonb not null,
   expires_at timestamp with time zone not null,
+  cancelled_at timestamp with time zone,
   created_at timestamp with time zone not null default now(),
   check (expires_at > created_at)
 );
@@ -19,6 +20,29 @@ create table public.share_request_responses (
   accepted_by_device_id uuid references public.devices (id) on delete set null,
   created_at timestamp with time zone not null default now()
 );
+
+create function public.ensure_share_request_open_for_response () returns trigger language plpgsql
+set
+  search_path = '' as $$
+begin
+  perform 1
+  from public.share_requests
+  where id = new.request_id
+    and cancelled_at is null
+    and expires_at > now()
+  for share;
+
+  if not found then
+    raise exception 'Share request cancelled or expired' using errcode = '55000';
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger ensure_share_request_open_for_response
+before insert on public.share_request_responses for each row
+execute function public.ensure_share_request_open_for_response ();
 
 alter table public.share_requests enable row level security;
 

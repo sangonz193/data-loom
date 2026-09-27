@@ -167,11 +167,47 @@ export const appRouter = router({
           !isDeepStrictEqual(request.payload, input.payload)
         )
           throw new TRPCError({ code: "CONFLICT" })
+        if (request.cancelled_at)
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Share request cancelled",
+          })
         if (new Date(request.expires_at).getTime() <= Date.now())
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
             message: "Share request expired",
           })
+        return request
+      }),
+    cancel: protectedProcedure
+      .input(z.object({ requestId: z.uuid() }))
+      .mutation(async ({ ctx, input }) => {
+        const admin = createAdminClient()
+        const { data: person, error: personError } = await admin
+          .from("people")
+          .select("id")
+          .eq("auth_user_id", ctx.userId)
+          .maybeSingle()
+        if (personError) throw personError
+        if (!person) throw new TRPCError({ code: "FORBIDDEN" })
+
+        const { data: cancelled, error: cancelError } = await admin
+          .from("share_requests")
+          .update({ cancelled_at: new Date().toISOString() })
+          .match({ id: input.requestId, from_person_id: person.id })
+          .is("cancelled_at", null)
+          .select()
+          .maybeSingle()
+        if (cancelError) throw cancelError
+        if (cancelled) return cancelled
+
+        const { data: request, error: requestError } = await admin
+          .from("share_requests")
+          .select()
+          .match({ id: input.requestId, from_person_id: person.id })
+          .maybeSingle()
+        if (requestError) throw requestError
+        if (!request) throw new TRPCError({ code: "NOT_FOUND" })
         return request
       }),
     respond: protectedProcedure
@@ -196,7 +232,6 @@ export const appRouter = router({
           .from("share_requests")
           .select("id")
           .match({ id: input.requestId, to_person_id: person.id })
-          .gt("expires_at", new Date().toISOString())
           .maybeSingle()
         if (requestError) throw requestError
         if (!request) throw new TRPCError({ code: "NOT_FOUND" })
@@ -209,17 +244,58 @@ export const appRouter = router({
         if (deviceError) throw deviceError
         if (!device) throw new TRPCError({ code: "FORBIDDEN" })
 
-        const { data, error } = await admin
-          .from("share_request_responses")
-          .upsert({
+        const readResponse = async () => {
+          const { data, error } = await admin
+            .from("share_request_responses")
+            .select()
+            .eq("request_id", request.id)
+            .maybeSingle()
+          if (error) throw error
+          return data
+        }
+        const resolveResponse = async () => {
+          const response = await readResponse()
+          if (!response) return null
+          if (
+            response.accepted !== input.accepted ||
+            (input.accepted && response.accepted_by_device_id !== device.id)
+          )
+            throw new TRPCError({ code: "CONFLICT" })
+          return response
+        }
+        const existing = await resolveResponse()
+        if (existing) return existing
+
+        const { error } = await admin.from("share_request_responses").upsert(
+          {
             request_id: request.id,
             accepted: input.accepted,
             accepted_by_device_id: input.accepted ? device.id : null,
-          })
-          .select()
+          },
+          { onConflict: "request_id", ignoreDuplicates: true },
+        )
+        if (error && error.code !== "55000") throw error
+        const response = await resolveResponse()
+        if (response) return response
+        const { data: currentRequest, error: currentRequestError } = await admin
+          .from("share_requests")
+          .select("cancelled_at, expires_at")
+          .eq("id", request.id)
           .single()
-        if (error) throw error
-        return data
+        if (currentRequestError) throw currentRequestError
+        if (
+          error?.code === "55000" ||
+          currentRequest.cancelled_at ||
+          new Date(currentRequest.expires_at).getTime() <= Date.now()
+        )
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message:
+              currentRequest.cancelled_at ?
+                "Share request cancelled"
+              : "Share request expired",
+          })
+        throw new Error("Share response insert did not persist")
       }),
   }),
   devices: router({
