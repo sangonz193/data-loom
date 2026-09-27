@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react"
 
-import { registerDevice } from "./create/actions"
+import { useTRPCClient } from "@/modules/api/client"
 
 const storageKey = "data-loom-device-id"
 
 export function useDevice() {
+  const trpcClient = useTRPCClient()
   const [device, setDevice] = useState<
     { id: string; personId: string } | undefined
   >()
@@ -19,14 +20,14 @@ export function useDevice() {
       localStorage.setItem(storageKey, id)
     }
 
-    registerDevice(id).then((registered) => {
+    trpcClient.devices.register.mutate({ id }).then((registered) => {
       if (!cancelled) setDevice(registered)
     })
 
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [trpcClient])
 
   return device
 }

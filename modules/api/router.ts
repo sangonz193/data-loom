@@ -15,6 +15,42 @@ import { protectedProcedure, router } from "./trpc"
 import { canonicalConnectionIds } from "../connections/create/connection-ids"
 
 export const appRouter = router({
+  devices: router({
+    register: protectedProcedure
+      .input(z.object({ id: z.uuid() }))
+      .mutation(async ({ ctx, input }) => {
+        const admin = createAdminClient()
+        const { data: person, error: personError } = await admin
+          .from("people")
+          .select("id")
+          .eq("auth_user_id", ctx.userId)
+          .maybeSingle()
+        if (personError) throw personError
+        if (!person) throw new TRPCError({ code: "FORBIDDEN" })
+
+        const lastSeenAt = new Date().toISOString()
+        const { error: insertError } = await admin.from("devices").upsert(
+          {
+            id: input.id,
+            person_id: person.id,
+            name: "This device",
+            last_seen_at: lastSeenAt,
+          },
+          { onConflict: "id", ignoreDuplicates: true },
+        )
+        if (insertError) throw insertError
+
+        const { data: device, error: updateError } = await admin
+          .from("devices")
+          .update({ name: "This device", last_seen_at: lastSeenAt })
+          .match({ id: input.id, person_id: person.id })
+          .select("id")
+          .maybeSingle()
+        if (updateError) throw updateError
+        if (!device) throw new TRPCError({ code: "FORBIDDEN" })
+        return { id: device.id, personId: person.id }
+      }),
+  }),
   pairing: router({
     create: protectedProcedure.mutation(async ({ ctx }) => {
       const admin = createAdminClient()

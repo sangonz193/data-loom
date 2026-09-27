@@ -29,30 +29,6 @@ async function currentPerson() {
   return person
 }
 
-export async function registerDevice(deviceIdInput: string) {
-  const id = uuid.parse(deviceIdInput)
-  const person = await currentPerson()
-  const admin = createAdminClient()
-  const { data: existing, error: existingError } = await admin
-    .from("devices")
-    .select("person_id")
-    .eq("id", id)
-    .maybeSingle()
-  if (existingError) throw existingError
-  if (existing && existing.person_id !== person.id) {
-    throw new Error("Device belongs to another person")
-  }
-
-  const { error } = await admin.from("devices").upsert({
-    id,
-    person_id: person.id,
-    name: "This device",
-    last_seen_at: new Date().toISOString(),
-  })
-  if (error) throw error
-  return { id, personId: person.id }
-}
-
 export async function createShareRequest(input: {
   deviceId: string
   toPersonId: string
