@@ -24,6 +24,10 @@ export function FilesList({ actor }: Props) {
       receiveFileRefs,
       sendFileRefs,
       request,
+      requestFailed:
+        state.value === "request failed" ||
+        state.matches({ "receiving connection": "acceptance failed" }) ||
+        state.value === "decline failed",
       showClear:
         state.can({ type: "clear-last-transfer" }) &&
         (!!state.context.request || !!state.context.filesToSend),
@@ -48,6 +52,7 @@ export function FilesList({ actor }: Props) {
             file={file}
             sendActorRef={sendActorRef}
             receiveActorRef={receiveActorRef}
+            requestFailed={state.requestFailed}
           />
         )
       })}

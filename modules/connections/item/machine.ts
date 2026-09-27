@@ -39,6 +39,8 @@ type Input = {
 interface Context extends Input {
   remoteDeviceId?: string
   filesToSend?: File[]
+  requestId?: string
+  requestPayload?: z.input<typeof requestPayloadSchema>
   peerConnection?: RTCPeerConnection
   dataChannels?: RTCDataChannel[]
   receiveFileRefs?: ActorRefFrom<typeof receiveFileActor>[]
@@ -61,6 +63,8 @@ type Event =
     }
   | { type: "accept" }
   | { type: "decline" }
+  | { type: "retry" }
+  | { type: "dismiss-error" }
   | { type: "clear-last-transfer" }
 
 export const connectionMachine = setup({
@@ -89,6 +93,14 @@ export const connectionMachine = setup({
     }),
     setFilesToContext: assign({
       filesToSend: (_, files: File[]) => files,
+      requestId: () => crypto.randomUUID(),
+      requestPayload: (_, files: File[]) => ({
+        files: files.map((file) => ({
+          name: file.name,
+          size: file.size,
+          mimeType: file.type,
+        })),
+      }),
     }),
     setDataChannelToContext: assign({
       dataChannels: (
@@ -105,13 +117,12 @@ export const connectionMachine = setup({
     setRequest: assign({
       request: (_, request: Tables<"share_requests">) => request,
     }),
-    sendResponse: ({ context }, accept: boolean) => {
-      sendResponse({ accept, context })
-    },
     clearLastTransfer: assign({
       receiveFileRefs: undefined,
       sendFileRefs: undefined,
       filesToSend: undefined,
+      requestId: undefined,
+      requestPayload: undefined,
       request: undefined,
       remoteDeviceId: undefined,
     }),
@@ -187,20 +198,22 @@ export const connectionMachine = setup({
     listenToFileRequestResponseTable,
     sendRequest: fromPromise<Tables<"share_requests">, Context>(
       async ({
-        input: { remoteUserId, deviceId, filesToSend, trpcClient },
+        input: {
+          remoteUserId,
+          deviceId,
+          requestId,
+          requestPayload,
+          trpcClient,
+        },
       }) => {
-        if (!filesToSend) throw new Error("`filesToSend` is not defined")
+        if (!requestId || !requestPayload)
+          throw new Error("Request is not defined")
 
         return trpcClient.shares.request.mutate({
+          requestId,
           deviceId,
           toPersonId: remoteUserId,
-          payload: {
-            files: filesToSend.map((fileToSend) => ({
-              name: fileToSend.name,
-              size: fileToSend.size,
-              mimeType: fileToSend.type,
-            })),
-          } satisfies z.input<typeof requestPayloadSchema>,
+          payload: requestPayload,
         })
       },
     ),
@@ -215,7 +228,13 @@ export const connectionMachine = setup({
   guards: {
     isFileDataChannel: (_, dataChannel: RTCDataChannel) =>
       dataChannel.label.startsWith("file:"),
-    accepted: (_, event: ListenToFileRequestResponseTableOutputEvent) =>
+    accepted: (
+      _,
+      event: Extract<
+        ListenToFileRequestResponseTableOutputEvent,
+        { type: "file-request-response" }
+      >,
+    ) =>
       event.response.accepted && event.response.accepted_by_device_id != null,
     peerConnectionIsClosed: ({ context }) =>
       context.peerConnection?.connectionState === "closed",
@@ -326,22 +345,16 @@ export const connectionMachine = setup({
     "prompting user to accept connection": {
       on: {
         accept: {
-          target: "accepting request",
+          target: "receiving connection",
           actions: "createPeerConnection",
         },
         decline: {
-          target: "idle",
-          actions: [
-            {
-              type: "sendResponse",
-              params: false,
-            },
-          ],
+          target: "declining request",
         },
       },
     },
 
-    "connecting with caller": {
+    "receiving connection": {
       invoke: {
         src: "connectReceiverPeerMachine",
         id: "connectReceiverPeerMachine",
@@ -351,6 +364,32 @@ export const connectionMachine = setup({
           peerConnection: context.peerConnection!,
           remoteDeviceId: context.remoteDeviceId!,
         }),
+      },
+
+      initial: "waiting for signals",
+
+      states: {
+        "waiting for signals": {
+          on: { "signals.ready": "accepting request" },
+        },
+        "accepting request": {
+          invoke: {
+            src: "sendResponse",
+            onDone: "connecting with caller",
+            onError: "acceptance failed",
+            input: ({ context }) => ({ context, accept: true }),
+          },
+        },
+        "acceptance failed": {
+          on: {
+            retry: "accepting request",
+            "dismiss-error": {
+              target: "#connection.idle",
+              actions: ["closePeerConnection", "clearLastTransfer"],
+            },
+          },
+        },
+        "connecting with caller": {},
       },
 
       on: {
@@ -388,6 +427,14 @@ export const connectionMachine = setup({
             params: ({ event }) => event.output,
           },
         },
+        onError: "request failed",
+      },
+    },
+
+    "request failed": {
+      on: {
+        retry: "sending request",
+        "dismiss-error": { target: "idle", actions: "clearLastTransfer" },
       },
     },
 
@@ -403,6 +450,7 @@ export const connectionMachine = setup({
       },
 
       on: {
+        "file-request-response.failed": "request failed",
         "file-request-response": [
           {
             target: "connecting",
@@ -422,11 +470,19 @@ export const connectionMachine = setup({
       },
     },
 
-    "accepting request": {
+    "declining request": {
       invoke: {
         src: "sendResponse",
-        onDone: "connecting with caller",
-        input: ({ context }) => ({ context, accept: true }),
+        input: ({ context }) => ({ context, accept: false }),
+        onDone: { target: "idle", actions: "clearLastTransfer" },
+        onError: "decline failed",
+      },
+    },
+
+    "decline failed": {
+      on: {
+        retry: "declining request",
+        "dismiss-error": { target: "idle", actions: "clearLastTransfer" },
       },
     },
 

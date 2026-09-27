@@ -62,8 +62,9 @@ test("receiver pins the requesting device before acceptance and clears it with t
       }),
     },
     actors: {
-      connectReceiverPeerMachine: fromCallback(({ input }) => {
+      connectReceiverPeerMachine: fromCallback(({ input, sendBack }) => {
         receiverInput = input
+        sendBack({ type: "signals.ready" })
       }) as never,
     },
   })
