@@ -100,7 +100,7 @@ export const newConnectionMachine = setup({
     connectCallerPeerMachine,
     connectReceiverPeerMachine,
     createCode: fromPromise(({ input }: { input: Context }) =>
-      input.trpcClient.pairing.create.mutate(),
+      input.trpcClient.pairing.create.mutate({ purpose: "connection" }),
     ),
     listenForRedemptions: fromCallback<{ type: "noop" }, Context>((params) => {
       const sendBack = params.sendBack as (event: Event) => void

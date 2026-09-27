@@ -50,14 +50,16 @@ integrationTest(
       const other = appRouter.createCaller({ userId: authUsers[2]!.id })
       const anonymous = appRouter.createCaller({ userId: null })
 
-      await expect(anonymous.pairing.create()).rejects.toMatchObject({
+      await expect(
+        anonymous.pairing.create({ purpose: "connection" }),
+      ).rejects.toMatchObject({
         code: "UNAUTHORIZED",
       })
       await expect(
         anonymous.pairing.redeem({ code: "ABCD" }),
       ).rejects.toMatchObject({ code: "UNAUTHORIZED" })
 
-      const first = await owner.pairing.create()
+      const first = await owner.pairing.create({ purpose: "connection" })
       expect(/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/.test(first.code)).toBe(
         true,
       )
@@ -83,7 +85,7 @@ integrationTest(
         redeemer.pairing.redeem({ code: deviceCode }),
       ).rejects.toMatchObject({ code: "NOT_FOUND" })
 
-      const second = await owner.pairing.create()
+      const second = await owner.pairing.create({ purpose: "connection" })
       const { data: ownerCodes, error: codesError } = await admin
         .from("pairing_codes")
         .select("code, purpose")
@@ -116,7 +118,7 @@ integrationTest(
         redeemer.pairing.redeem({ code: second.code }),
       ).rejects.toMatchObject({ code: "NOT_FOUND" })
 
-      const active = await owner.pairing.create()
+      const active = await owner.pairing.create({ purpose: "connection" })
       const alphabeticCode = `A${active.code.slice(1)}`
       const { error: activeError } = await admin
         .from("pairing_codes")
@@ -162,7 +164,7 @@ integrationTest(
         redeemer.pairing.redeem({ code: alphabeticCode }),
       ).rejects.toMatchObject({ code: "NOT_FOUND" })
 
-      const concurrent = await owner.pairing.create()
+      const concurrent = await owner.pairing.create({ purpose: "connection" })
       const contenders = [
         { caller: redeemer, personId: redeemerId },
         { caller: other, personId: otherId },
@@ -193,7 +195,9 @@ integrationTest(
         }
       }
 
-      const concurrentRetries = await owner.pairing.create()
+      const concurrentRetries = await owner.pairing.create({
+        purpose: "connection",
+      })
       expect(
         await Promise.all(
           Array.from({ length: 4 }, () =>
@@ -261,7 +265,7 @@ integrationTest(
       const redeemer = appRouter.createCaller({ userId: authUsers[1]!.id })
       const other = appRouter.createCaller({ userId: authUsers[2]!.id })
       const anonymous = appRouter.createCaller({ userId: null })
-      const code = (await owner.pairing.create()).code
+      const code = (await owner.pairing.create({ purpose: "connection" })).code
       const deviceId = crypto.randomUUID()
       const { error: deviceError } = await admin.from("devices").insert({
         id: deviceId,
