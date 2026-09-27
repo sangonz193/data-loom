@@ -149,14 +149,22 @@ export const appRouter = router({
           },
           { onConflict: "id", ignoreDuplicates: true },
         )
-        if (error) throw error
+        if (error && error.code !== "55000") throw error
 
         const { data: request, error: requestError } = await admin
           .from("share_requests")
           .select()
           .eq("id", input.requestId)
-          .single()
+          .maybeSingle()
         if (requestError) throw requestError
+        if (!request) {
+          if (error?.code === "55000")
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: "Share request cancelled",
+            })
+          throw new Error("Share request insert did not persist")
+        }
         if (
           request.from_person_id !== person.id ||
           request.from_device_id !== device.id
@@ -167,7 +175,7 @@ export const appRouter = router({
           !isDeepStrictEqual(request.payload, input.payload)
         )
           throw new TRPCError({ code: "CONFLICT" })
-        if (request.cancelled_at)
+        if (request.cancelled_at || error?.code === "55000")
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
             message: "Share request cancelled",
@@ -192,23 +200,15 @@ export const appRouter = router({
         if (!person) throw new TRPCError({ code: "FORBIDDEN" })
 
         const { data: cancelled, error: cancelError } = await admin
-          .from("share_requests")
-          .update({ cancelled_at: new Date().toISOString() })
-          .match({ id: input.requestId, from_person_id: person.id })
-          .is("cancelled_at", null)
-          .select()
-          .maybeSingle()
+          .rpc("cancel_share_request", {
+            sender_id: person.id,
+            share_request_id: input.requestId,
+          })
+          .single()
+        if (cancelError?.code === "PT404")
+          throw new TRPCError({ code: "NOT_FOUND" })
         if (cancelError) throw cancelError
-        if (cancelled) return cancelled
-
-        const { data: request, error: requestError } = await admin
-          .from("share_requests")
-          .select()
-          .match({ id: input.requestId, from_person_id: person.id })
-          .maybeSingle()
-        if (requestError) throw requestError
-        if (!request) throw new TRPCError({ code: "NOT_FOUND" })
-        return request
+        return cancelled
       }),
     respond: protectedProcedure
       .input(
