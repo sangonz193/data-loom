@@ -5,6 +5,7 @@ import { z } from "zod"
 
 import { canCreateConnection } from "@/modules/connections/create/connection-authorization"
 import {
+  CODE_ALPHABET,
   CODE_EXPIRATION_MINUTES,
   CODE_LENGTH,
 } from "@/modules/connections/create/constants"
@@ -472,7 +473,7 @@ export const appRouter = router({
           .match({ person_id: person.id, purpose: input.purpose })
         if (deleteError) throw deleteError
 
-        const alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+        const alphabet = CODE_ALPHABET
         const values = crypto.getRandomValues(new Uint32Array(CODE_LENGTH))
         const code = Array.from(
           values,

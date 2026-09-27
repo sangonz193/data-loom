@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useRef, useState, type FormEvent } from "react"
+import { useEffect, useRef, useState, type FormEvent } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,14 +14,35 @@ import { useRequiredUser } from "../use-user"
 import { linkErrorCode } from "./complete-device-link"
 import { createIsolatedAuth } from "./isolated-auth"
 import { useDeviceLink } from "./provider"
+import { parseSetupLink } from "./setup-link"
 
 export function LinkDevice() {
   const user = useRequiredUser()
+  const [initialLink, setInitialLink] = useState<{
+    setup: ReturnType<typeof parseSetupLink>
+  }>()
+  const consumed = useRef(false)
+  useEffect(() => {
+    if (consumed.current) return
+    consumed.current = true
+    const setup = user.is_anonymous ? parseSetupLink(location.hash) : undefined
+    setInitialLink({ setup })
+    if (location.hash) {
+      // Preserve Next's router state so replacing the fragment does not restore the route.
+      history.replaceState(
+        history.state,
+        "",
+        location.pathname + location.search,
+      )
+    }
+  }, [user.is_anonymous])
   return (
     <div className="mx-auto w-full max-w-md gap-6 px-4 py-8">
       <h1 className="text-2xl font-semibold">Link this browser</h1>
       {user.is_anonymous ?
-        <RegisterDevice />
+        initialLink ?
+          <RegisterDevice setup={initialLink.setup} />
+        : <p role="status">Registering this browser…</p>
       : <>
           <p>
             Already signed in as {user.email}. This browser does not need
@@ -36,7 +57,11 @@ export function LinkDevice() {
   )
 }
 
-function RegisterDevice() {
+function RegisterDevice({
+  setup,
+}: {
+  setup: ReturnType<typeof parseSetupLink>
+}) {
   const { device, error, retry } = useDevice()
   if (error)
     return (
@@ -46,13 +71,20 @@ function RegisterDevice() {
       </>
     )
   if (!device) return <p role="status">Registering this browser…</p>
-  return <LinkForm deviceId={device.id} />
+  return <LinkForm deviceId={device.id} setup={setup} />
 }
 
-function LinkForm({ deviceId }: { deviceId: string }) {
+function LinkForm({
+  deviceId,
+  setup,
+}: {
+  deviceId: string
+  setup: ReturnType<typeof parseSetupLink>
+}) {
   const user = useRequiredUser()
   const api = useTRPCClient()
-  const [code, setCode] = useState("")
+  const [code, setCode] = useState(setup?.code ?? "")
+  const [fromQr, setFromQr] = useState(!!setup)
   const [redeemed, setRedeemed] = useState(false)
   const [redeeming, setBusy] = useState(false)
   const completion = useDeviceLink()
@@ -153,12 +185,21 @@ function LinkForm({ deviceId }: { deviceId: string }) {
         </p>
       )}
       {!redeemed ?
-        <form onSubmit={redeem} className="flex flex-col gap-3">
+        <form key="code" onSubmit={redeem} className="flex flex-col gap-3">
+          {fromQr && (
+            <p role="status">
+              Code filled in from the QR code. Check it matches your other
+              device, then continue.
+            </p>
+          )}
           <label htmlFor="setup-code">Setup code</label>
           <Input
             id="setup-code"
             value={code}
-            onChange={(event) => setCode(event.target.value)}
+            onChange={(event) => {
+              setCode(event.target.value)
+              setFromQr(false)
+            }}
             autoComplete="off"
             autoCapitalize="characters"
             spellCheck={false}
@@ -169,8 +210,15 @@ function LinkForm({ deviceId }: { deviceId: string }) {
           />
           <Button disabled={busy}>Use setup code</Button>
         </form>
-      : <form onSubmit={signIn} className="flex flex-col gap-3">
-          <p>Sign in to the account that displayed this code.</p>
+      : <form
+          key="credentials"
+          onSubmit={signIn}
+          className="flex flex-col gap-3"
+        >
+          <p>
+            Sign in to the account that displayed this code
+            {fromQr && setup?.hint && ` (looks like ${setup.hint})`}.
+          </p>
           <label htmlFor="link-email">Email</label>
           <Input
             id="link-email"
@@ -196,6 +244,7 @@ function LinkForm({ deviceId }: { deviceId: string }) {
             disabled={busy}
             onClick={() => {
               setRedeemed(false)
+              setFromQr(false)
               setError("")
             }}
           >

@@ -18,3 +18,7 @@ export function safeRedirect(value: unknown) {
     return "/home"
   return `${url.pathname}${url.search}${url.hash}`
 }
+
+export function withCurrentFragment(destination: string, hash: string) {
+  return destination.includes("#") ? destination : `${destination}${hash}`
+}

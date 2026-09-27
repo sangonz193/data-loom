@@ -1,10 +1,10 @@
 import "../styles/globals.css"
 import "../styles/reset.css"
 
-import { Analytics } from "@vercel/analytics/react"
 import { GeistSans } from "geist/font/sans"
 import type { PropsWithChildren } from "react"
 
+import { Analytics } from "@/components/analytics"
 import { Footer } from "@/components/footer"
 import { cn } from "@/lib/cn"
 import { DeviceLinkProvider } from "@/modules/auth/device-link/provider"
