@@ -46,7 +46,11 @@ test("failed connection creation exits the caller spinner", async () => {
   expect(actor.getSnapshot().value).toBe("listening for redemptions")
   actor.send({ type: "redemption-listener.ready" })
   expect(actor.getSnapshot().context.isRedemptionListenerReady).toBe(true)
-  actor.send({ type: "redemption-received", remoteUserId: "person-b" })
+  actor.send({
+    type: "redemption-received",
+    remoteUserId: "person-b",
+    remoteDeviceId: "device-b",
+  })
   await settle()
   expect(actor.getSnapshot().value).toBe("connection errored")
   actor.stop()
@@ -102,3 +106,109 @@ for (const action of ["create-code", "redeem-code"] as const) {
     actor.stop()
   })
 }
+
+test("owner waits for subscription and passes the matching redemption device to the caller", async () => {
+  const remoteUserId = crypto.randomUUID()
+  const remoteDeviceId = crypto.randomUUID()
+  let notify!: (payload: unknown) => void
+  let subscribed!: (status: string) => void
+  let callerInput: unknown
+  const channel = {
+    on: (
+      _type: string,
+      _filter: unknown,
+      callback: (event: { payload: unknown }) => void,
+    ) => {
+      notify = (payload) => callback({ payload })
+      return channel
+    },
+    subscribe: (callback: (status: string) => void) => {
+      subscribed = callback
+      return channel
+    },
+  }
+  const machine = newConnectionMachine.provide({
+    actions: { createPeer: () => {} },
+    actors: {
+      createCode: fromPromise(async () => ({
+        code: "PAIRCODE",
+        created_at: new Date().toISOString(),
+      })),
+      connectCallerPeerMachine: fromCallback(({ input }) => {
+        callerInput = input
+      }) as unknown as typeof connectCallerPeerMachine,
+    },
+  })
+  const actor = createActor(machine, {
+    input: {
+      ...input,
+      supabase: { channel: () => channel, removeChannel: () => {} } as never,
+    },
+  }).start()
+  actor.send({ type: "create-code" })
+  await settle()
+  expect(actor.getSnapshot().context.isRedemptionListenerReady).toBeFalsy()
+  subscribed("SUBSCRIBED")
+  expect(actor.getSnapshot().context.isRedemptionListenerReady).toBe(true)
+  for (const payload of [
+    null,
+    { code: "PAIRCODE", remotePersonId: remoteUserId },
+    { code: "OTHER", remotePersonId: remoteUserId, remoteDeviceId },
+    {
+      code: "PAIRCODE",
+      remotePersonId: remoteUserId,
+      remoteDeviceId: "invalid",
+    },
+  ])
+    notify(payload)
+  expect(callerInput).toBeUndefined()
+  notify({ code: "PAIRCODE", remotePersonId: remoteUserId, remoteDeviceId })
+  expect(callerInput).toMatchObject({
+    remoteUserId,
+    remoteDeviceId,
+    deviceId: input.deviceId,
+  })
+  actor.stop()
+})
+
+test("redeemer subscribes before notifying with its device and bootstraps with only the expected person", async () => {
+  const notifications: unknown[] = []
+  let receiverInput: unknown
+  const machine = newConnectionMachine.provide({
+    actions: { createPeer: () => {} },
+    actors: {
+      redeemCode: fromPromise(async () => ({ remotePersonId: "owner" })),
+      connectReceiverPeerMachine: fromCallback(({ input }) => {
+        receiverInput = input
+      }) as unknown as typeof connectReceiverPeerMachine,
+    },
+  })
+  const actor = createActor(machine, {
+    input: {
+      ...input,
+      trpcClient: {
+        pairing: {
+          notifyRedeemed: {
+            mutate: async (value: unknown) => {
+              notifications.push(value)
+            },
+          },
+        },
+      } as never,
+    },
+  }).start()
+  actor.send({ type: "redeem-code", code: "PAIRCODE" })
+  await settle()
+  expect(receiverInput).toMatchObject({
+    remoteUserId: "owner",
+    deviceId: input.deviceId,
+  })
+  expect((receiverInput as MachineContext).remoteDeviceId).toBeUndefined()
+  expect(notifications).toEqual([])
+  actor.send({ type: "signals.ready" })
+  await settle()
+  expect(notifications).toEqual([
+    { code: "PAIRCODE", deviceId: input.deviceId },
+  ])
+  actor.stop()
+})

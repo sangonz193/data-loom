@@ -8,6 +8,7 @@ import {
   CODE_LENGTH,
 } from "@/modules/connections/create/constants"
 import { requestPayloadSchema } from "@/modules/connections/file-sharing-requests/payload"
+import { signalPayload } from "@/modules/connections/signal-payload"
 import { createAdminClient } from "@/utils/supabase/admin"
 
 import { getConnectionRedemptions } from "./connection-redemptions"
@@ -17,23 +18,16 @@ import { protectedProcedure, router } from "./trpc"
 import { canonicalConnectionIds } from "../connections/create/connection-ids"
 import { canSendSignal } from "../connections/create/signal-authorization"
 
-const signalPayload = z.union([
-  z.object({ type: z.literal("offer"), sdp: z.string() }).strict(),
-  z.object({ type: z.literal("answer"), sdp: z.string() }).strict(),
-  z
-    .object({
-      candidate: z.string(),
-      sdpMid: z.string().nullable().optional(),
-      sdpMLineIndex: z.number().int().nonnegative().nullable().optional(),
-      usernameFragment: z.string().nullable().optional(),
-    })
-    .strict(),
-])
-
 export const appRouter = router({
   signals: router({
     send: protectedProcedure
-      .input(z.object({ toPersonId: z.uuid(), payload: signalPayload }))
+      .input(
+        z.object({
+          deviceId: z.uuid(),
+          toDeviceId: z.uuid(),
+          payload: signalPayload,
+        }),
+      )
       .mutation(async ({ ctx, input }) => {
         const admin = createAdminClient()
         const { data: person, error: personError } = await admin
@@ -44,9 +38,22 @@ export const appRouter = router({
         if (personError) throw personError
         if (!person) throw new TRPCError({ code: "FORBIDDEN" })
 
+        if (input.deviceId === input.toDeviceId)
+          throw new TRPCError({ code: "BAD_REQUEST" })
+
+        const { data: devices, error: devicesError } = await admin
+          .from("devices")
+          .select("id, person_id")
+          .in("id", [input.deviceId, input.toDeviceId])
+        if (devicesError) throw devicesError
+        const source = devices.find((device) => device.id === input.deviceId)
+        const target = devices.find((device) => device.id === input.toDeviceId)
+        if (!source || source.person_id !== person.id || !target)
+          throw new TRPCError({ code: "FORBIDDEN" })
+
         const [person_1_id, person_2_id] = canonicalConnectionIds(
           person.id,
-          input.toPersonId,
+          target.person_id,
         )
         const { data: connection, error: connectionError } = await admin
           .from("connections")
@@ -59,11 +66,11 @@ export const appRouter = router({
           fromPersonId: string
           codePersonId: string
         }[] = []
-        if (!connection && person.id !== input.toPersonId) {
+        if (!connection && person.id !== target.person_id) {
           const { data: redemptions, error } = await getConnectionRedemptions(
             admin,
             person.id,
-            input.toPersonId,
+            target.person_id,
           )
           if (error) throw error
           freshPairingRedemptions = redemptions.map((redemption) => ({
@@ -75,22 +82,17 @@ export const appRouter = router({
           !canSendSignal({
             hasConnection: !!connection,
             fromPersonId: person.id,
-            toPersonId: input.toPersonId,
+            toPersonId: target.person_id,
             freshPairingRedemptions,
           })
         )
           throw new TRPCError({ code: "FORBIDDEN" })
 
-        const { data: devices, error: devicesError } = await admin
-          .from("devices")
-          .select("id")
-          .eq("person_id", input.toPersonId)
-        if (devicesError) throw devicesError
-        await sendSignalBroadcast(
-          admin,
-          devices.map((device) => device.id),
-          { fromPersonId: person.id, payload: input.payload },
-        )
+        await sendSignalBroadcast(admin, target.id, {
+          fromPersonId: person.id,
+          fromDeviceId: source.id,
+          payload: input.payload,
+        })
       }),
   }),
   shares: router({
@@ -315,7 +317,12 @@ export const appRouter = router({
         return { remotePersonId: pairingCode.person_id }
       }),
     notifyRedeemed: protectedProcedure
-      .input(z.object({ code: z.string().trim().min(1).max(32).toUpperCase() }))
+      .input(
+        z.object({
+          code: z.string().trim().min(1).max(32).toUpperCase(),
+          deviceId: z.uuid(),
+        }),
+      )
       .mutation(async ({ ctx, input }) => {
         const admin = createAdminClient()
         const { data: person, error: personError } = await admin
@@ -325,6 +332,14 @@ export const appRouter = router({
           .maybeSingle()
         if (personError) throw personError
         if (!person) throw new TRPCError({ code: "FORBIDDEN" })
+
+        const { data: device, error: deviceError } = await admin
+          .from("devices")
+          .select("id")
+          .match({ id: input.deviceId, person_id: person.id })
+          .maybeSingle()
+        if (deviceError) throw deviceError
+        if (!device) throw new TRPCError({ code: "FORBIDDEN" })
 
         const { data: redemption, error } = await admin
           .from("pairing_code_redemptions")
@@ -347,7 +362,11 @@ export const appRouter = router({
         await sendPairingRedemption(
           admin,
           devices.map((device) => device.id),
-          { remotePersonId: person.id, code: redemption.code },
+          {
+            remotePersonId: person.id,
+            remoteDeviceId: device.id,
+            code: redemption.code,
+          },
         )
       }),
   }),

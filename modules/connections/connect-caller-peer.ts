@@ -1,6 +1,6 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js"
 import type { TRPCClient } from "@trpc/client"
-import { assign, sendTo, setup, sendParent } from "xstate"
+import { assign, sendTo, setup, sendParent, spawnChild } from "xstate"
 
 import { logger } from "@/logger"
 import type { AppRouter } from "@/modules/api/router"
@@ -20,6 +20,7 @@ type Input = {
   supabase: SupabaseClient<Database>
   currentUser: User
   remoteUserId: string
+  remoteDeviceId: string
   deviceId: string
   trpcClient: TRPCClient<AppRouter>
 }
@@ -63,13 +64,14 @@ export const connectCallerPeerMachine = setup({
       answer: (_, answer: RTCSessionDescriptionInit) => answer,
     }),
     sendOffer: (
-      { context: { remoteUserId, trpcClient }, self },
+      { context: { deviceId, remoteDeviceId, trpcClient }, self },
       offer: RTCSessionDescriptionInit,
     ) => {
       logger.info("[connectCallerPeerMachine] sending offer", offer)
       trpcClient.signals.send
         .mutate({
-          toPersonId: remoteUserId,
+          deviceId,
+          toDeviceId: remoteDeviceId,
           payload: offer as { type: "offer"; sdp: string },
         })
         .catch((error) => {
@@ -81,13 +83,14 @@ export const connectCallerPeerMachine = setup({
         })
     },
     sendIceCandidate: (
-      { context: { remoteUserId, trpcClient }, self },
+      { context: { deviceId, remoteDeviceId, trpcClient }, self },
       candidate: RTCIceCandidate,
     ) => {
       logger.info("[connectCallerPeerMachine] sending ice candidate", candidate)
       trpcClient.signals.send
         .mutate({
-          toPersonId: remoteUserId,
+          deviceId,
+          toDeviceId: remoteDeviceId,
           payload: { ...candidate.toJSON(), candidate: candidate.candidate },
         })
         .catch((error) => {
@@ -109,7 +112,7 @@ export const connectCallerPeerMachine = setup({
     }),
     sendPendingIceCandidates: assign({
       pendingIceCandidates: ({
-        context: { pendingIceCandidates, remoteUserId, trpcClient },
+        context: { pendingIceCandidates, deviceId, remoteDeviceId, trpcClient },
         self,
       }) => {
         logger.info(
@@ -119,7 +122,8 @@ export const connectCallerPeerMachine = setup({
         for (const candidate of pendingIceCandidates) {
           trpcClient.signals.send
             .mutate({
-              toPersonId: remoteUserId,
+              deviceId,
+              toDeviceId: remoteDeviceId,
               payload: {
                 ...candidate.toJSON(),
                 candidate: candidate.candidate,
@@ -209,14 +213,13 @@ export const connectCallerPeerMachine = setup({
     },
 
     "creating offer": {
-      invoke: {
-        src: "connectPeer",
+      entry: spawnChild("connectPeer", {
         id: "connectPeer",
         input: ({ context }) => ({
           calling: true,
           peerConnection: context.peerConnection,
         }),
-      },
+      }),
 
       always: {
         target: "waiting for answer",

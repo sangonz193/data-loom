@@ -270,25 +270,38 @@ integrationTest(
       })
       if (deviceError) throw deviceError
 
+      const redeemerDeviceId = crypto.randomUUID()
+      const otherDeviceId = crypto.randomUUID()
+      const { error: extraDevicesError } = await admin.from("devices").insert([
+        { id: redeemerDeviceId, person_id: redeemerId, name: "Redeemer" },
+        { id: otherDeviceId, person_id: otherId, name: "Other" },
+      ])
+      if (extraDevicesError) throw extraDevicesError
+
       await expect(
-        anonymous.pairing.notifyRedeemed({ code }),
+        anonymous.pairing.notifyRedeemed({ code, deviceId }),
       ).rejects.toMatchObject({ code: "UNAUTHORIZED" })
       await expect(
         anonymous.connections.create({ remotePersonId: redeemerId }),
       ).rejects.toMatchObject({ code: "UNAUTHORIZED" })
       await expect(
-        redeemer.pairing.notifyRedeemed({ code }),
+        redeemer.pairing.notifyRedeemed({ code, deviceId: redeemerDeviceId }),
       ).rejects.toMatchObject({ code: "NOT_FOUND" })
       await expect(
         owner.connections.create({ remotePersonId: redeemerId }),
       ).rejects.toMatchObject({ code: "NOT_FOUND" })
 
       await redeemer.pairing.redeem({ code })
+      for (const foreignDeviceId of [deviceId, crypto.randomUUID()]) {
+        await expect(
+          redeemer.pairing.notifyRedeemed({ code, deviceId: foreignDeviceId }),
+        ).rejects.toMatchObject({ code: "FORBIDDEN" })
+      }
       await expect(
-        other.pairing.notifyRedeemed({ code }),
+        other.pairing.notifyRedeemed({ code, deviceId: otherDeviceId }),
       ).rejects.toMatchObject({ code: "NOT_FOUND" })
       await expect(
-        owner.pairing.notifyRedeemed({ code }),
+        owner.pairing.notifyRedeemed({ code, deviceId }),
       ).rejects.toMatchObject({ code: "NOT_FOUND" })
       await expect(
         other.connections.create({ remotePersonId: ownerId }),
@@ -311,7 +324,10 @@ integrationTest(
         .insert({ code: deviceCode, from_person_id: redeemerId })
       if (deviceRedemptionError) throw deviceRedemptionError
       await expect(
-        redeemer.pairing.notifyRedeemed({ code: deviceCode }),
+        redeemer.pairing.notifyRedeemed({
+          code: deviceCode,
+          deviceId: redeemerDeviceId,
+        }),
       ).rejects.toMatchObject({ code: "NOT_FOUND" })
 
       subscriber = createClient(
@@ -336,7 +352,10 @@ integrationTest(
             subscribed.reject(error ?? new Error(status))
         })
       await subscribed.promise
-      await redeemer.pairing.notifyRedeemed({ code })
+      await redeemer.pairing.notifyRedeemed({
+        code,
+        deviceId: redeemerDeviceId,
+      })
       expect(
         await Promise.race([
           broadcast.promise,
@@ -344,7 +363,11 @@ integrationTest(
             setTimeout(() => reject(new Error("Broadcast timed out")), 5000),
           ),
         ]),
-      ).toEqual({ remotePersonId: redeemerId, code })
+      ).toEqual({
+        remotePersonId: redeemerId,
+        remoteDeviceId: redeemerDeviceId,
+        code,
+      })
 
       await owner.connections.create({ remotePersonId: redeemerId })
       const [person_1_id, person_2_id] = canonicalConnectionIds(
@@ -365,7 +388,7 @@ integrationTest(
         .eq("code", code)
       if (expiryError) throw expiryError
       await expect(
-        redeemer.pairing.notifyRedeemed({ code }),
+        redeemer.pairing.notifyRedeemed({ code, deviceId: redeemerDeviceId }),
       ).rejects.toMatchObject({ code: "NOT_FOUND" })
       await expect(
         owner.connections.create({ remotePersonId: redeemerId }),

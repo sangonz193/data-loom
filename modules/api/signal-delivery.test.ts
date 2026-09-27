@@ -16,6 +16,7 @@ for (const fails of [false, true]) {
             expect(event).toBe("signal")
             expect(payload).toEqual({
               fromPersonId: "sender",
+              fromDeviceId: "sender-device",
               payload: { type: "offer", sdp: "sdp" },
             })
             if (fails && topic === "device:second") throw new Error("offline")
@@ -27,12 +28,13 @@ for (const fails of [false, true]) {
       },
     } as unknown as ReturnType<typeof createAdminClient>
 
-    const send = sendSignalBroadcast(admin, ["first", "second"], {
+    const send = sendSignalBroadcast(admin, "second", {
       fromPersonId: "sender",
+      fromDeviceId: "sender-device",
       payload: { type: "offer", sdp: "sdp" },
     })
     if (fails) await expect(send).rejects.toThrow("offline")
     else await send
-    expect(removed.sort()).toEqual(["device:first", "device:second"])
+    expect(removed.sort()).toEqual(["device:second"])
   })
 }
