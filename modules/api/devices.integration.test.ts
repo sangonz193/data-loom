@@ -1,5 +1,7 @@
+import { createClient } from "@supabase/supabase-js"
 import { expect, test } from "bun:test"
 
+import type { Database } from "@/supabase/types"
 import { createAdminClient } from "@/utils/supabase/admin"
 
 import { appRouter } from "./router"
@@ -49,11 +51,13 @@ integrationTest(
       const anonymous = appRouter.createCaller({ userId: null })
       const id = crypto.randomUUID()
 
-      await expect(anonymous.devices.register({ id })).rejects.toMatchObject({
+      await expect(
+        anonymous.devices.register({ id, name: "Browser" }),
+      ).rejects.toMatchObject({
         code: "UNAUTHORIZED",
       })
       await expect(
-        first.devices.register({ id: "invalid" }),
+        first.devices.register({ id: "invalid", name: "Browser" }),
       ).rejects.toMatchObject({
         code: "BAD_REQUEST",
       })
@@ -65,7 +69,9 @@ integrationTest(
       if (beforeError) throw beforeError
       expect(before).toBeNull()
 
-      expect(await first.devices.register({ id })).toEqual({
+      expect(
+        await first.devices.register({ id, name: "Chrome on macOS" }),
+      ).toEqual({
         id,
         personId: firstPersonId,
       })
@@ -76,7 +82,7 @@ integrationTest(
         .single()
       if (createdError) throw createdError
       expect(created.person_id).toBe(firstPersonId)
-      expect(created.name).toBe("This device")
+      expect(created.name).toBe("Chrome on macOS")
       expect(created.last_seen_at).toBeTruthy()
 
       const { error: renameError } = await admin
@@ -87,7 +93,9 @@ integrationTest(
         })
         .eq("id", id)
       if (renameError) throw renameError
-      expect(await first.devices.register({ id })).toEqual({
+      expect(
+        await first.devices.register({ id, name: "Chrome on macOS" }),
+      ).toEqual({
         id,
         personId: firstPersonId,
       })
@@ -98,12 +106,14 @@ integrationTest(
         .single()
       if (repeatedError) throw repeatedError
       expect(repeated.person_id).toBe(firstPersonId)
-      expect(repeated.name).toBe("This device")
+      expect(repeated.name).toBe("Renamed device")
       expect(new Date(repeated.last_seen_at).getTime()).toBeGreaterThan(
         new Date("2020-01-01T00:00:00Z").getTime(),
       )
 
-      await expect(second.devices.register({ id })).rejects.toMatchObject({
+      await expect(
+        second.devices.register({ id, name: "Firefox" }),
+      ).rejects.toMatchObject({
         code: "FORBIDDEN",
         message: "DEVICE_OWNED_BY_ANOTHER_PERSON",
       })
@@ -122,7 +132,7 @@ integrationTest(
       ]
       const attempts = await Promise.allSettled(
         contenders.map(({ caller }) =>
-          caller.devices.register({ id: competingId }),
+          caller.devices.register({ id: competingId, name: "Browser" }),
         ),
       )
       expect(
@@ -361,7 +371,12 @@ integrationTest(
         accepted_by_device_id: null,
       })
 
-      expect(await owner.devices.register({ id: ownDevice })).toEqual({
+      expect(
+        await owner.devices.register({
+          id: ownDevice,
+          name: "Chrome on Linux",
+        }),
+      ).toEqual({
         id: ownDevice,
         personId: ownerId,
       })
@@ -371,12 +386,155 @@ integrationTest(
         .eq("id", ownDevice)
         .single()
       if (recreatedError) throw recreatedError
-      expect(recreated).toEqual({ person_id: ownerId, name: "This device" })
+      expect(recreated).toEqual({ person_id: ownerId, name: "Chrome on Linux" })
     } finally {
       await Promise.all(
         users
           .flatMap(({ data }) => (data.user ? [data.user.id] : []))
           .map((userId) => admin.auth.admin.deleteUser(userId)),
+      )
+    }
+  },
+)
+
+integrationTest(
+  "rename and browser device access stay scoped to the owner",
+  async () => {
+    const admin = createAdminClient()
+    const password = crypto.randomUUID()
+    const email = `device-rename-${crypto.randomUUID()}@example.test`
+    const users = await Promise.all([
+      admin.auth.admin.createUser({ email, password, email_confirm: true }),
+      admin.auth.admin.createUser({
+        email: `device-foreign-${crypto.randomUUID()}@example.test`,
+        password: crypto.randomUUID(),
+        email_confirm: true,
+      }),
+    ])
+    try {
+      const ownerId = users[0].data.user?.id
+      const foreignId = users[1].data.user?.id
+      if (!ownerId || !foreignId) throw new Error("User creation failed")
+      const owner = appRouter.createCaller({ userId: ownerId })
+      const foreign = appRouter.createCaller({ userId: foreignId })
+      const anonymous = appRouter.createCaller({ userId: null })
+      const ownDevice = crypto.randomUUID()
+      const foreignDevice = crypto.randomUUID()
+      await owner.devices.register({ id: ownDevice, name: "Chrome" })
+      await foreign.devices.register({ id: foreignDevice, name: "Firefox" })
+
+      await expect(
+        anonymous.devices.rename({ id: ownDevice, name: "New" }),
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" })
+      for (const name of ["", "   ", "a".repeat(65), "a\nb"])
+        await expect(
+          owner.devices.rename({ id: ownDevice, name }),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST" })
+      await expect(
+        owner.devices.rename({ id: foreignDevice, name: "Wrong" }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" })
+      await expect(
+        owner.devices.rename({ id: crypto.randomUUID(), name: "Missing" }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" })
+
+      const { data: before, error: beforeError } = await admin
+        .from("devices")
+        .select("last_seen_at")
+        .eq("id", ownDevice)
+        .single()
+      if (beforeError) throw beforeError
+      expect(
+        await owner.devices.rename({ id: ownDevice, name: "  Laptop  " }),
+      ).toEqual({ id: ownDevice, name: "Laptop" })
+      const { data: renamed, error: renamedError } = await admin
+        .from("devices")
+        .select("name, last_seen_at")
+        .eq("id", ownDevice)
+        .single()
+      if (renamedError) throw renamedError
+      expect(renamed).toEqual({
+        name: "Laptop",
+        last_seen_at: before.last_seen_at,
+      })
+      const { data: untouched, error: untouchedError } = await admin
+        .from("devices")
+        .select("name")
+        .eq("id", foreignDevice)
+        .single()
+      if (untouchedError) throw untouchedError
+      expect(untouched.name).toBe("Firefox")
+
+      const browser = createClient<Database>(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+        { auth: { persistSession: false, autoRefreshToken: false } },
+      )
+      const { error: signInError } = await browser.auth.signInWithPassword({
+        email,
+        password,
+      })
+      if (signInError) throw signInError
+      const { data: visible, error: selectError } = await browser
+        .from("devices")
+        .select("id, name")
+      if (selectError) throw selectError
+      expect(visible).toEqual([{ id: ownDevice, name: "Laptop" }])
+      const { data: updated, error: updateError } = await browser
+        .from("devices")
+        .update({ name: "Browser write" })
+        .eq("id", ownDevice)
+        .select("id")
+      expect(updateError).toBeNull()
+      expect(updated).toEqual([])
+      const { data: deleted, error: deleteError } = await browser
+        .from("devices")
+        .delete()
+        .eq("id", ownDevice)
+        .select("id")
+      expect(deleteError).toBeNull()
+      expect(deleted).toEqual([])
+      const { error: insertError } = await browser.from("devices").insert({
+        id: crypto.randomUUID(),
+        person_id: (
+          await owner.devices.register({ id: ownDevice, name: "Chrome" })
+        ).personId,
+        name: "Browser",
+      })
+      expect(insertError?.code).toBe("42501")
+      const { data: retained, error: retainedError } = await admin
+        .from("devices")
+        .select("name")
+        .eq("id", ownDevice)
+        .single()
+      if (retainedError) throw retainedError
+      expect(retained.name).toBe("Laptop")
+
+      await owner.devices.remove({ id: ownDevice })
+      await expect(
+        owner.devices.rename({ id: ownDevice, name: "Missing" }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" })
+      await owner.devices.register({ id: ownDevice, name: "Safari on macOS" })
+      const { data: recreated, error: recreatedError } = await admin
+        .from("devices")
+        .select("name")
+        .eq("id", ownDevice)
+        .single()
+      if (recreatedError) throw recreatedError
+      expect(recreated.name).toBe("Safari on macOS")
+
+      const { error: personDeleteError } = await admin
+        .from("people")
+        .delete()
+        .eq("auth_user_id", ownerId)
+      if (personDeleteError) throw personDeleteError
+      await expect(
+        owner.devices.rename({ id: ownDevice, name: "No person" }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" })
+    } finally {
+      await Promise.all(
+        users.flatMap(({ data }) =>
+          data.user ? [admin.auth.admin.deleteUser(data.user.id)] : [],
+        ),
       )
     }
   },

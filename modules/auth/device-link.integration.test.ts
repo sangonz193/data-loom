@@ -64,7 +64,7 @@ async function fixture() {
   }
   const device = await registerDevice(
     b.id,
-    (id) => caller.devices.register({ id }),
+    (id) => caller.devices.register({ id, name: "Browser" }),
     deviceStorage,
   )
   const { code } = await appRouter
@@ -213,7 +213,9 @@ integrationTest(
       const device = await registerDevice(
         f.a.id,
         (id) =>
-          appRouter.createCaller({ userId: f.a.id }).devices.register({ id }),
+          appRouter
+            .createCaller({ userId: f.a.id })
+            .devices.register({ id, name: "Browser" }),
         f.deviceStorage,
       )
       expect(device.id).toBe(f.deviceId)
@@ -283,7 +285,9 @@ integrationTest(
       const device = await registerDevice(
         f.a.id,
         (id) =>
-          appRouter.createCaller({ userId: f.a.id }).devices.register({ id }),
+          appRouter
+            .createCaller({ userId: f.a.id })
+            .devices.register({ id, name: "Browser" }),
         f.deviceStorage,
       )
       expect(device.id).toBe(f.deviceId)

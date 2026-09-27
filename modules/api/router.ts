@@ -9,6 +9,7 @@ import {
   CODE_EXPIRATION_MINUTES,
   CODE_LENGTH,
 } from "@/modules/connections/create/constants"
+import { DEVICE_NAME_MAX_LENGTH } from "@/modules/connections/device-name"
 import { requestPayloadSchema } from "@/modules/connections/file-sharing-requests/payload"
 import { signalPayload } from "@/modules/connections/signal-payload"
 import { createAdminClient } from "@/utils/supabase/admin"
@@ -22,6 +23,12 @@ import { canSendSignal } from "../connections/create/signal-authorization"
 
 const pairingCode = z.string().trim().min(1).max(32).toUpperCase()
 const pairingPurpose = z.enum(["connection", "device"])
+const deviceName = z
+  .string()
+  .trim()
+  .min(1)
+  .max(DEVICE_NAME_MAX_LENGTH)
+  .regex(/^\P{Cc}*$/u)
 const COMPLETE_LINK_ATTEMPTS = 3
 
 async function isAnonymousAuthUser(
@@ -410,8 +417,30 @@ export const appRouter = router({
         if (error) throw error
         if (!device) throw new TRPCError({ code: "NOT_FOUND" })
       }),
+    rename: protectedProcedure
+      .input(z.object({ id: z.uuid(), name: deviceName }))
+      .mutation(async ({ ctx, input }) => {
+        const admin = createAdminClient()
+        const { data: person, error: personError } = await admin
+          .from("people")
+          .select("id")
+          .eq("auth_user_id", ctx.userId)
+          .maybeSingle()
+        if (personError) throw personError
+        if (!person) throw new TRPCError({ code: "FORBIDDEN" })
+
+        const { data: device, error } = await admin
+          .from("devices")
+          .update({ name: input.name })
+          .match({ id: input.id, person_id: person.id })
+          .select("id, name")
+          .maybeSingle()
+        if (error) throw error
+        if (!device) throw new TRPCError({ code: "NOT_FOUND" })
+        return device
+      }),
     register: protectedProcedure
-      .input(z.object({ id: z.uuid() }))
+      .input(z.object({ id: z.uuid(), name: deviceName }))
       .mutation(async ({ ctx, input }) => {
         const admin = createAdminClient()
         const { data: person, error: personError } = await admin
@@ -427,7 +456,7 @@ export const appRouter = router({
           {
             id: input.id,
             person_id: person.id,
-            name: "This device",
+            name: input.name,
             last_seen_at: lastSeenAt,
           },
           { onConflict: "id", ignoreDuplicates: true },
@@ -436,7 +465,7 @@ export const appRouter = router({
 
         const { data: device, error: updateError } = await admin
           .from("devices")
-          .update({ name: "This device", last_seen_at: lastSeenAt })
+          .update({ last_seen_at: lastSeenAt })
           .match({ id: input.id, person_id: person.id })
           .select("id")
           .maybeSingle()
