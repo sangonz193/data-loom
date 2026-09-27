@@ -528,6 +528,148 @@ for (const subscribed of [false, true]) {
   })
 }
 
+for (const staleOutcome of ["accepted", "expired"] as const) {
+  test(`reconnect during a pending ${staleOutcome} snapshot reconciles missed cancellation first`, async () => {
+    jest.useFakeTimers()
+    const listener = startListener()
+    try {
+      const expiresAt = new Date(Date.now() - 1_000).toISOString()
+      listener.status("SUBSCRIBED")
+      const staleRequest = listener.requestSnapshot
+      const staleResponse = listener.snapshot
+      listener.status("CHANNEL_ERROR")
+      listener.nextSnapshot()
+      listener.requestSnapshot.resolve({
+        data: { cancelled_at: new Date().toISOString(), expires_at: expiresAt },
+        error: null,
+      })
+      listener.snapshot.resolve({ data: response, error: null })
+      listener.status("SUBSCRIBED")
+      listener.status("SUBSCRIBED")
+      expect(listener.reads).toBe(2)
+      staleRequest.resolve({
+        data: { cancelled_at: null, expires_at: expiresAt },
+        error: null,
+      })
+      staleResponse.resolve({
+        data: staleOutcome === "accepted" ? response : null,
+        error: null,
+      })
+      await settle()
+      expect(listener.reads).toBe(4)
+      expect(listener.events).toEqual([
+        { type: "file-request-response.failed" },
+        { type: "file-request.cancelled", requestId: response.request_id },
+      ])
+      listener.status("SUBSCRIBED")
+      listener.insert()
+      listener.cancel()
+      jest.advanceTimersByTime(60_000)
+      expect(listener.reads).toBe(4)
+      expect(listener.events).toHaveLength(2)
+      expect(jest.getTimerCount()).toBe(0)
+    } finally {
+      listener.actor.stop()
+      jest.useRealTimers()
+    }
+  })
+}
+
+test("repeated reconnects queue one fresh snapshot per pending read without replaying acceptance", async () => {
+  const listener = startListener()
+  try {
+    listener.status("SUBSCRIBED")
+    listener.open()
+    listener.snapshot.resolve({ data: response, error: null })
+    await settle()
+    for (let index = 0; index < 2; index++) {
+      listener.nextSnapshot()
+      listener.status("SUBSCRIBED")
+      const staleRequest = listener.requestSnapshot
+      const staleResponse = listener.snapshot
+      listener.nextSnapshot()
+      listener.status("SUBSCRIBED")
+      listener.status("SUBSCRIBED")
+      staleRequest.resolve({
+        data: {
+          cancelled_at: null,
+          expires_at: new Date(Date.now() + 600_000).toISOString(),
+        },
+        error: null,
+      })
+      staleResponse.resolve({ data: response, error: null })
+      await settle()
+      expect(listener.reads).toBe(6 + index * 4)
+      listener.open()
+      listener.snapshot.resolve({ data: response, error: null })
+      await settle()
+      expect(listener.events).toEqual([
+        { type: "file-request-response", response },
+      ])
+    }
+  } finally {
+    listener.actor.stop()
+  }
+})
+
+for (const cleanup of ["stop", "cancel"] as const) {
+  test(`${cleanup} prevents a queued reconnect read after the pending snapshot settles`, async () => {
+    jest.useFakeTimers()
+    const listener = startListener()
+    try {
+      listener.status("SUBSCRIBED")
+      listener.status("SUBSCRIBED")
+      if (cleanup === "stop") {
+        listener.actor.stop()
+        expect(listener.signal?.aborted).toBe(true)
+        expect(listener.removed).toBe(true)
+      } else listener.cancel()
+      listener.open()
+      listener.snapshot.resolve({ data: response, error: null })
+      await settle()
+      listener.status("SUBSCRIBED")
+      listener.insert()
+      jest.advanceTimersByTime(60_000)
+      expect(listener.reads).toBe(2)
+      expect(listener.events).toEqual(
+        cleanup === "stop" ?
+          []
+        : [{ type: "file-request.cancelled", requestId: response.request_id }],
+      )
+      expect(jest.getTimerCount()).toBe(0)
+    } finally {
+      listener.actor.stop()
+      jest.useRealTimers()
+    }
+  })
+}
+
+test("a queued reconnect snapshot retains its read timeout and cleanup", async () => {
+  jest.useFakeTimers()
+  const listener = startListener()
+  try {
+    listener.status("SUBSCRIBED")
+    listener.status("SUBSCRIBED")
+    listener.open()
+    listener.snapshot.resolve({ data: response, error: null })
+    listener.nextSnapshot()
+    await settle()
+    expect(listener.reads).toBe(4)
+    expect(listener.events).toEqual([])
+    jest.advanceTimersByTime(15_000)
+    expect(listener.signal?.aborted).toBe(true)
+    expect(listener.events).toEqual([{ type: "file-request-response.failed" }])
+    listener.open()
+    listener.snapshot.resolve({ data: response, error: null })
+    await settle()
+    expect(listener.events).toHaveLength(1)
+    expect(jest.getTimerCount()).toBe(0)
+  } finally {
+    listener.actor.stop()
+    jest.useRealTimers()
+  }
+})
+
 test("reconnect reads both snapshots again without replaying the response", async () => {
   const listener = startListener()
   listener.status("SUBSCRIBED")

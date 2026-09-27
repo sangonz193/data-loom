@@ -27,6 +27,7 @@ export const listenToFileRequestResponseTable = fromCallback<
   let deliveredResponse = false
   let failed = false
   let reading = false
+  let readQueued = false
   let ready = false
   let response: Tables<"share_request_responses"> | undefined
   let expiresAt: string | undefined
@@ -67,8 +68,13 @@ export const listenToFileRequestResponseTable = fromCallback<
     }
   }
   const readSnapshot = async () => {
-    if (stopped || cancelled || expired || reading) return
+    if (stopped || cancelled || expired) return
+    if (reading) {
+      readQueued = true
+      return
+    }
     reading = true
+    readQueued = false
     ready = false
     clearTimeout(expiryTimer)
     const snapshotStartedAt = Date.now()
@@ -99,6 +105,7 @@ export const listenToFileRequestResponseTable = fromCallback<
         cancel()
         return
       }
+      if (readQueued) return
       if (responseResult.error) throw responseResult.error
       expiresAt = requestResult.data.expires_at
       response ??= responseResult.data ?? undefined
@@ -110,6 +117,7 @@ export const listenToFileRequestResponseTable = fromCallback<
     } finally {
       reading = false
       clearTimeout(readTimer)
+      if (readQueued) void readSnapshot()
     }
   }
 
