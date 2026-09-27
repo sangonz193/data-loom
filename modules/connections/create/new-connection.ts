@@ -11,6 +11,7 @@ import type { CallerOutputEvent } from "../connect-caller-peer"
 import { connectCallerPeerMachine } from "../connect-caller-peer"
 import type { ReceiverOutputEvent } from "../connect-receiver-peer"
 import { connectReceiverPeerMachine } from "../connect-receiver-peer"
+import { subscribeDeviceChannel } from "../device-channel"
 
 type Input = {
   supabase: SupabaseClient<Database>
@@ -47,6 +48,9 @@ type Event =
     }
   | {
       type: "redemption-listener.ready"
+    }
+  | {
+      type: "redemption-listener.failed"
     }
   | {
       type: "redeem-code"
@@ -102,9 +106,9 @@ export const newConnectionMachine = setup({
       const sendBack = params.sendBack as (event: Event) => void
       const { supabase, createdCode, deviceId } = params.input
 
-      const channel = supabase
-        .channel(`device:${deviceId}`, { config: { private: true } })
-        .on("broadcast", { event: "pairing-redemption" }, ({ payload }) => {
+      return subscribeDeviceChannel(supabase, deviceId, {
+        event: "pairing-redemption",
+        onMessage: (payload) => {
           const parsed = redemptionSchema.safeParse(payload)
           if (!parsed.success || parsed.data.code !== createdCode?.code) return
           sendBack({
@@ -112,25 +116,16 @@ export const newConnectionMachine = setup({
             remoteUserId: parsed.data.remotePersonId,
             remoteDeviceId: parsed.data.remoteDeviceId,
           })
-        })
-        .subscribe((status, err) => {
-          logger.info(
-            "[new-connection] Listening to pairing code redemption status:",
-            status,
+        },
+        onReady: () => sendBack({ type: "redemption-listener.ready" }),
+        onError: (error) => {
+          logger.error(
+            { error },
+            "[new-connection] Redemption subscription failed",
           )
-          if (err)
-            logger.error(
-              "[new-connection] Error listening to pairing code redemption",
-              err,
-            )
-          if (status === "SUBSCRIBED") {
-            sendBack({ type: "redemption-listener.ready" })
-          }
-        })
-
-      return () => {
-        supabase.removeChannel(channel)
-      }
+          sendBack({ type: "redemption-listener.failed" })
+        },
+      })
     }),
     createUserConnection: fromPromise(({ input }: { input: Context }) =>
       input.trpcClient.connections.create.mutate({
@@ -202,6 +197,7 @@ export const newConnectionMachine = setup({
       },
 
       on: {
+        "redemption-listener.failed": "connection errored",
         "redemption-listener.ready": {
           actions: "setRedemptionListenerReady",
         },

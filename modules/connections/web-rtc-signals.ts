@@ -5,6 +5,8 @@ import { z } from "zod"
 import { logger } from "@/logger"
 import type { Database } from "@/supabase/types"
 
+import type { ConnectPeerOutputEvent } from "./connect-peer"
+import { subscribeDeviceChannel } from "./device-channel"
 import { signalPayload } from "./signal-payload"
 
 type Input = {
@@ -15,6 +17,7 @@ type Input = {
 }
 
 export type WebRtcSignalsOutputEvent =
+  | Extract<ConnectPeerOutputEvent, { type: "peer-connection.failed" }>
   | { type: "signals.ready" }
   | { type: "signals.ice-candidate"; iceCandidate: RTCIceCandidate }
   | { type: "signals.answer"; answer: RTCSessionDescriptionInit }
@@ -78,20 +81,13 @@ export const webRtcSignals = fromCallback<{ type: "noop" }, Input>((params) => {
   const { deviceId, supabase } = params.input
   const routeSignal = createSignalRouter(params.input, sendBack)
 
-  const channel = supabase
-    .channel(`device:${deviceId}`, { config: { private: true } })
-    .on("broadcast", { event: "signal" }, ({ payload }) => {
-      routeSignal(payload)
-    })
-    .subscribe((status, error) => {
-      if (error) logger.error("[webRtcSignals] subscription failed", error)
-      else {
-        logger.info("[webRtcSignals] subscription", status)
-        sendSignalChannelReady(status, sendBack)
-      }
-    })
-
-  return () => {
-    supabase.removeChannel(channel)
-  }
+  return subscribeDeviceChannel(supabase, deviceId, {
+    event: "signal",
+    onMessage: routeSignal,
+    onReady: () => sendSignalChannelReady("SUBSCRIBED", sendBack),
+    onError: (error) => {
+      logger.error({ error }, "[webRtcSignals] subscription failed")
+      sendBack({ type: "peer-connection.failed", error: { type: "unknown" } })
+    },
+  })
 })
