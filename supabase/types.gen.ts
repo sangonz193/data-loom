@@ -230,6 +230,32 @@ export type Database = {
           },
         ]
       }
+      share_request_intents: {
+        Row: {
+          cancelled_at: string | null
+          from_person_id: string
+          request_id: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          from_person_id: string
+          request_id: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          from_person_id?: string
+          request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "share_request_intents_from_person_id_fkey"
+            columns: ["from_person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       share_request_responses: {
         Row: {
           accepted: boolean
@@ -329,6 +355,13 @@ export type Database = {
       can_access_share_request: {
         Args: { share_request_id: string }
         Returns: boolean
+      }
+      cancel_share_request: {
+        Args: { sender_id: string; share_request_id: string }
+        Returns: {
+          cancelled_at: string
+          id: string
+        }[]
       }
       current_person_id: { Args: never; Returns: string }
       people_are_connected: {

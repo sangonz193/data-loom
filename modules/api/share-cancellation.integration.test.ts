@@ -112,9 +112,10 @@ integrationTest(
       await expect(
         sender.shares.cancel({ requestId: "invalid" }),
       ).rejects.toMatchObject({ code: "BAD_REQUEST" })
-      await expect(
-        sender.shares.cancel({ requestId: crypto.randomUUID() }),
-      ).rejects.toMatchObject({ code: "NOT_FOUND" })
+      expect(
+        (await sender.shares.cancel({ requestId: crypto.randomUUID() }))
+          .cancelled_at,
+      ).toBeTruthy()
       await expect(recipient.shares.cancel(cancelInput)).rejects.toMatchObject({
         code: "NOT_FOUND",
       })
