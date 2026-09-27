@@ -4,9 +4,185 @@ import { expect, test } from "bun:test"
 import type { Database } from "@/supabase/types"
 import { createAdminClient } from "@/utils/supabase/admin"
 
+import { holdDeviceLinkRows } from "./device-link-locks"
 import { appRouter } from "./router"
 
 const integrationTest = process.env.RUN_DB_TESTS === "1" ? test : test.skip
+
+integrationTest(
+  "registration replaces only the owner's exact legacy device name",
+  async () => {
+    const admin = createAdminClient()
+    const users = await Promise.all(
+      ["owner", "foreign"].map((label) =>
+        admin.auth.admin.createUser({
+          email: `device-name-${label}-${crypto.randomUUID()}@example.test`,
+          password: crypto.randomUUID(),
+          email_confirm: true,
+        }),
+      ),
+    )
+    try {
+      const authIds = users.map(({ data, error }) => {
+        if (error || !data.user)
+          throw error ?? new Error("User creation failed")
+        return data.user.id
+      })
+      const { data: people, error: peopleError } = await admin
+        .from("people")
+        .select("id, auth_user_id")
+        .in("auth_user_id", authIds)
+      if (peopleError) throw peopleError
+      const personId = (authId: string) => {
+        const person = people.find((row) => row.auth_user_id === authId)
+        if (!person) throw new Error("Person creation failed")
+        return person.id
+      }
+      const ownerId = personId(authIds[0]!)
+      const foreignId = personId(authIds[1]!)
+      const owner = appRouter.createCaller({ userId: authIds[0]! })
+      const legacyId = crypto.randomUUID()
+      const foreignDeviceId = crypto.randomUUID()
+      const names = ["Laptop", "this device", "This Device", "This device  "]
+      const customIds = names.map(() => crypto.randomUUID())
+      const oldLastSeen = "2020-01-01T00:00:00Z"
+      const { error: insertError } = await admin.from("devices").insert([
+        {
+          id: legacyId,
+          person_id: ownerId,
+          name: "This device",
+          last_seen_at: oldLastSeen,
+        },
+        ...customIds.map((id, index) => ({
+          id,
+          person_id: ownerId,
+          name: names[index]!,
+          last_seen_at: oldLastSeen,
+        })),
+        {
+          id: foreignDeviceId,
+          person_id: foreignId,
+          name: "This device",
+          last_seen_at: oldLastSeen,
+        },
+      ])
+      if (insertError) throw insertError
+
+      await owner.devices.register({ id: legacyId, name: "Chrome on macOS" })
+      for (const id of customIds)
+        await owner.devices.register({ id, name: "Chrome on macOS" })
+      const { data: updated, error: updateError } = await admin
+        .from("devices")
+        .select("id, name, last_seen_at")
+        .in("id", [legacyId, ...customIds])
+      if (updateError) throw updateError
+      expect(updated.find(({ id }) => id === legacyId)?.name).toBe(
+        "Chrome on macOS",
+      )
+      for (const [index, id] of customIds.entries())
+        expect(updated.find((device) => device.id === id)?.name).toBe(
+          names[index],
+        )
+      for (const device of updated)
+        expect(new Date(device.last_seen_at).getTime()).toBeGreaterThan(
+          new Date(oldLastSeen).getTime(),
+        )
+
+      await owner.devices.rename({ id: legacyId, name: "This device" })
+      await owner.devices.register({ id: legacyId, name: "Firefox on Linux" })
+      const { data: renamed, error: renameError } = await admin
+        .from("devices")
+        .select("name")
+        .eq("id", legacyId)
+        .single()
+      if (renameError) throw renameError
+      expect(renamed.name).toBe("Firefox on Linux")
+
+      await expect(
+        owner.devices.register({
+          id: foreignDeviceId,
+          name: "Chrome on macOS",
+        }),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        message: "DEVICE_OWNED_BY_ANOTHER_PERSON",
+      })
+      const { data: foreign, error: foreignError } = await admin
+        .from("devices")
+        .select("person_id, name, last_seen_at")
+        .eq("id", foreignDeviceId)
+        .single()
+      if (foreignError) throw foreignError
+      expect(foreign.person_id).toBe(foreignId)
+      expect(foreign.name).toBe("This device")
+      expect(new Date(foreign.last_seen_at).getTime()).toBe(
+        new Date(oldLastSeen).getTime(),
+      )
+    } finally {
+      await Promise.all(
+        users.flatMap(({ data }) =>
+          data.user ? [admin.auth.admin.deleteUser(data.user.id)] : [],
+        ),
+      )
+    }
+  },
+)
+
+integrationTest(
+  "registration preserves a rename committed while its name update waits",
+  async () => {
+    const databaseUrl = process.env.DB_URL
+    if (!databaseUrl) throw new Error("DB_URL is required")
+    const admin = createAdminClient()
+    const { data, error } = await admin.auth.admin.createUser({
+      email: `device-rename-race-${crypto.randomUUID()}@example.test`,
+      password: crypto.randomUUID(),
+      email_confirm: true,
+    })
+    if (error || !data.user) throw error ?? new Error("User creation failed")
+    const authId = data.user.id
+    let hold: Awaited<ReturnType<typeof holdDeviceLinkRows>> | undefined
+    try {
+      const { data: person, error: personError } = await admin
+        .from("people")
+        .select("id")
+        .eq("auth_user_id", authId)
+        .single()
+      if (personError) throw personError
+      const id = crypto.randomUUID()
+      const { error: insertError } = await admin.from("devices").insert({
+        id,
+        person_id: person.id,
+        name: "This device",
+      })
+      if (insertError) throw insertError
+      hold = await holdDeviceLinkRows(databaseUrl, {
+        hold: [
+          ["select id from public.devices where id = $1 for update", [id]],
+        ],
+        finish: [
+          ["update public.devices set name = 'Desk' where id = $1", [id]],
+        ],
+      })
+      const registration = appRouter
+        .createCaller({ userId: authId })
+        .devices.register({ id, name: "Chrome on macOS" })
+      await hold.waitForBlocked()
+      await hold.release()
+      await registration
+      const { data: device, error: deviceError } = await admin
+        .from("devices")
+        .select("name")
+        .eq("id", id)
+        .single()
+      if (deviceError) throw deviceError
+      expect(device.name).toBe("Desk")
+    } finally {
+      await hold?.close()
+      await admin.auth.admin.deleteUser(authId)
+    }
+  },
+)
 
 integrationTest(
   "device registration enforces ownership under contention",

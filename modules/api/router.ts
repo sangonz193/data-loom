@@ -463,6 +463,12 @@ export const appRouter = router({
         )
         if (insertError) throw insertError
 
+        const { error: nameError } = await admin
+          .from("devices")
+          .update({ name: input.name })
+          .match({ id: input.id, person_id: person.id, name: "This device" })
+        if (nameError) throw nameError
+
         const { data: device, error: updateError } = await admin
           .from("devices")
           .update({ last_seen_at: lastSeenAt })
