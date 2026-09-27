@@ -47,7 +47,11 @@ export const appRouter = router({
           .select("id")
           .maybeSingle()
         if (updateError) throw updateError
-        if (!device) throw new TRPCError({ code: "FORBIDDEN" })
+        if (!device)
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "DEVICE_OWNED_BY_ANOTHER_PERSON",
+          })
         return { id: device.id, personId: person.id }
       }),
   }),
