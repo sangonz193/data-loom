@@ -1,55 +1,27 @@
 "use client"
 
-import { useMutation } from "@tanstack/react-query"
-import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { Spinner } from "@/components/ui/spinner"
-import { logger } from "@/logger"
 import { createClient } from "@/utils/supabase/client"
 
-export function AutoSignIn() {
-  const { data, mutate, isPending } = useMutation({
-    mutationFn: async () => {
-      const supabase = createClient()
+import { ensureSession } from "./anonymous-sign-in"
+import { authTransitions, runAuthTransition } from "./auth-transition"
 
-      const data = await supabase.auth.signInAnonymously().then(async (res) => {
-        if (res.error) {
-          logger.child(res.error).error("[auto-sign-in] Error")
-          alert(res.error.message)
-        }
-
-        return res.data
-      })
-
-      logger.child(data).info("[auto-sign-in] Data")
-
-      return data
-    },
-  })
+export function AutoSignIn({ destination }: { destination: string }) {
+  const started = useRef(false)
+  const [error, setError] = useState("")
 
   useEffect(() => {
-    let canceled = false
+    if (started.current) return
+    started.current = true
+    void runAuthTransition(async () => {
+      await ensureSession(createClient().auth)
+      await authTransitions.navigate(destination)
+    }).catch((error: Error) => setError(error.message))
+  }, [destination])
 
-    ;(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100))
-      if (canceled) return
-
-      mutate()
-    })()
-
-    return () => {
-      canceled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const router = useRouter()
-  useEffect(() => {
-    if (data?.user) {
-      router.refresh()
-    }
-  }, [data?.user, router])
-
-  return <>{isPending && <Spinner className="mx-auto mt-5" />}</>
+  return error ?
+      <p role="alert">{error}</p>
+    : <Spinner className="mx-auto mt-5" />
 }

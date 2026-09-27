@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 
 import { AutoSignIn } from "@/modules/auth/auto-sign-in"
+import { safeRedirect } from "@/modules/auth/safe-redirect"
 import { createClient } from "@/utils/supabase/server"
 
 export type AutoLoginSearchParams = {
@@ -11,7 +12,7 @@ export default async function Page(props: {
   searchParams: Promise<AutoLoginSearchParams>
 }) {
   const searchParams = await props.searchParams
-  const redirectTo = searchParams.redirectTo
+  const redirectTo = safeRedirect(searchParams.redirectTo)
   const supabase = await createClient()
 
   const {
@@ -19,8 +20,8 @@ export default async function Page(props: {
   } = await supabase.auth.getUser()
 
   if (user) {
-    redirect(redirectTo || "/home")
+    redirect(redirectTo)
   }
 
-  return <AutoSignIn />
+  return <AutoSignIn destination={redirectTo} />
 }
