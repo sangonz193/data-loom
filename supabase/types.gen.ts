@@ -268,6 +268,7 @@ export type Database = {
       }
       share_requests: {
         Row: {
+          cancelled_at: string | null
           created_at: string
           expires_at: string
           from_device_id: string
@@ -277,6 +278,7 @@ export type Database = {
           to_person_id: string
         }
         Insert: {
+          cancelled_at?: string | null
           created_at?: string
           expires_at: string
           from_device_id: string
@@ -286,6 +288,7 @@ export type Database = {
           to_person_id: string
         }
         Update: {
+          cancelled_at?: string | null
           created_at?: string
           expires_at?: string
           from_device_id?: string

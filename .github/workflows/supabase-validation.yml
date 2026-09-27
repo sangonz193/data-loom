@@ -52,6 +52,7 @@ jobs:
             echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$(jq -r '.PUBLISHABLE_KEY' <<< "$status_json")"
             echo "SUPABASE_SECRET_KEY=$(jq -r '.SECRET_KEY' <<< "$status_json")"
             echo "SUPABASE_JWT_SECRET=$(jq -r '.JWT_SECRET' <<< "$status_json")"
+            echo "DB_URL=$(jq -r '.DB_URL' <<< "$status_json")"
             echo "RUN_DB_TESTS=1"
           } >> "$GITHUB_ENV"
       - run: bun test modules/api/*.integration.test.ts
