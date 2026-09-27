@@ -180,6 +180,7 @@ export const newConnectionMachine = setup({
       invoke: {
         src: "createCode",
         input: ({ context }) => context,
+        onError: "connection errored",
         onDone: {
           target: "listening for redemptions",
           actions: {
@@ -248,6 +249,7 @@ export const newConnectionMachine = setup({
       invoke: {
         src: "createUserConnection",
         onDone: "connected",
+        onError: "connection errored",
         input: ({ context }) => context,
       },
     },
@@ -256,6 +258,7 @@ export const newConnectionMachine = setup({
       invoke: {
         src: "redeemCode",
         input: ({ context }) => context,
+        onError: "connection errored",
         onDone: {
           target: "connecting receiver",
           actions: [

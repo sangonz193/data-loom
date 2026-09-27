@@ -9,6 +9,8 @@ import {
 } from "@/modules/connections/create/constants"
 import { createAdminClient } from "@/utils/supabase/admin"
 
+import { getConnectionRedemptions } from "./connection-redemptions"
+import { sendPairingRedemption } from "./pairing-redemption-delivery"
 import { protectedProcedure, router } from "./trpc"
 import { canonicalConnectionIds } from "../connections/create/connection-ids"
 
@@ -121,16 +123,10 @@ export const appRouter = router({
           .select("id")
           .eq("person_id", redemption.pairing_codes.person_id)
         if (devicesError) throw devicesError
-        await Promise.all(
-          devices.map((device) =>
-            admin
-              .channel(`device:${device.id}`, { config: { private: true } })
-              .send({
-                type: "broadcast",
-                event: "pairing-redemption",
-                payload: { remotePersonId: person.id, code: redemption.code },
-              }),
-          ),
+        await sendPairingRedemption(
+          admin,
+          devices.map((device) => device.id),
+          { remotePersonId: person.id, code: redemption.code },
         )
       }),
   }),
@@ -147,16 +143,11 @@ export const appRouter = router({
         if (personError) throw personError
         if (!person) throw new TRPCError({ code: "FORBIDDEN" })
 
-        const { data: redemptions, error } = await admin
-          .from("pairing_code_redemptions")
-          .select(
-            "from_person_id, pairing_codes!inner(person_id, purpose, created_at)",
-          )
-          .eq("pairing_codes.purpose", "connection")
-          .gte(
-            "pairing_codes.created_at",
-            subMinutes(new Date(), CODE_EXPIRATION_MINUTES).toISOString(),
-          )
+        const { data: redemptions, error } = await getConnectionRedemptions(
+          admin,
+          person.id,
+          input.remotePersonId,
+        )
         if (error) throw error
         if (
           !canCreateConnection({

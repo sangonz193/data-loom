@@ -93,7 +93,9 @@ function MachineContent({ deviceId }: { deviceId: string }) {
           />
         )}
 
-      {state.value === "connection errored" && <ConnectionErrored />}
+      {state.value === "connection errored" && (
+        <ConnectionErrored isPeerError={!!state.context.connectionErrorEvent} />
+      )}
     </>
   )
 }
