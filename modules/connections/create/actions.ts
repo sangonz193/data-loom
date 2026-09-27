@@ -1,6 +1,6 @@
 "use server"
 
-import { addMinutes, subMinutes } from "date-fns"
+import { subMinutes } from "date-fns"
 import { z } from "zod"
 
 import { createAdminClient } from "@/utils/supabase/admin"
@@ -27,88 +27,6 @@ async function currentPerson() {
     .single()
   if (error || !person) throw error ?? new Error("Person not found")
   return person
-}
-
-export async function createShareRequest(input: {
-  deviceId: string
-  toPersonId: string
-  payload: unknown
-}) {
-  const deviceId = uuid.parse(input.deviceId)
-  const toPersonId = uuid.parse(input.toPersonId)
-  const person = await currentPerson()
-  const admin = createAdminClient()
-  const { data: device, error: deviceError } = await admin
-    .from("devices")
-    .select("id")
-    .match({ id: deviceId, person_id: person.id })
-    .single()
-  if (deviceError || !device) throw deviceError ?? new Error("Device not found")
-
-  const [person_1_id, person_2_id] = canonicalConnectionIds(
-    person.id,
-    toPersonId,
-  )
-  const { data: connection, error: connectionError } = await admin
-    .from("connections")
-    .select("person_1_id")
-    .match({ person_1_id, person_2_id })
-    .maybeSingle()
-  if (connectionError) throw connectionError
-  if (!connection && person.id !== toPersonId)
-    throw new Error("Connection not found")
-
-  const { data, error } = await admin
-    .from("share_requests")
-    .insert({
-      from_person_id: person.id,
-      from_device_id: deviceId,
-      to_person_id: toPersonId,
-      payload: input.payload as never,
-      expires_at: addMinutes(new Date(), 10).toISOString(),
-    })
-    .select()
-    .single()
-  if (error) throw error
-  return data
-}
-
-export async function respondToShareRequest(input: {
-  requestId: string
-  accepted: boolean
-  deviceId: string
-}) {
-  const requestId = uuid.parse(input.requestId)
-  const deviceId = uuid.parse(input.deviceId)
-  const person = await currentPerson()
-  const admin = createAdminClient()
-  const { data: request, error: requestError } = await admin
-    .from("share_requests")
-    .select("id")
-    .match({ id: requestId, to_person_id: person.id })
-    .gt("expires_at", new Date().toISOString())
-    .single()
-  if (requestError || !request)
-    throw requestError ?? new Error("Share request not found")
-
-  const { data: device, error: deviceError } = await admin
-    .from("devices")
-    .select("id")
-    .match({ id: deviceId, person_id: person.id })
-    .single()
-  if (deviceError || !device) throw deviceError ?? new Error("Device not found")
-
-  const { data, error } = await admin
-    .from("share_request_responses")
-    .upsert({
-      request_id: request.id,
-      accepted: input.accepted,
-      accepted_by_device_id: input.accepted ? device.id : null,
-    })
-    .select()
-    .single()
-  if (error) throw error
-  return data
 }
 
 export async function sendSignal(input: {

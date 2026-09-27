@@ -5,6 +5,7 @@ import { useDropzone } from "react-dropzone"
 
 import { Avatar, getUserName } from "@/components/avatar"
 import { cn } from "@/lib/cn"
+import { useTRPCClient } from "@/modules/api/client"
 import { themeClassNames } from "@/styles/themeClasses"
 import { createClient } from "@/utils/supabase/client"
 
@@ -48,6 +49,7 @@ function ConnectionContent({
 }: Props & { deviceId: string; personId: string }) {
   const supabase = createClient()
   const user = useRequiredUser()
+  const trpcClient = useTRPCClient()
 
   const remoteUser =
     connection.person_1_id === personId ?
@@ -61,6 +63,7 @@ function ConnectionContent({
   const [state, send, actor] = useMachine(connectionMachine, {
     input: {
       supabase,
+      trpcClient,
       currentUser: user,
       remoteUserId,
       deviceId,
