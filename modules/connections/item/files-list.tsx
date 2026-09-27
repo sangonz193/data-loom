@@ -26,6 +26,8 @@ export function FilesList({ actor }: Props) {
       request,
       requestFailed:
         state.value === "request failed" ||
+        state.value === "cancellation failed" ||
+        state.value === "cancelling request" ||
         state.matches({ "receiving connection": "acceptance failed" }) ||
         state.value === "decline failed",
       showClear:

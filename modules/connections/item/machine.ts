@@ -1,13 +1,14 @@
 import type { User } from "@supabase/supabase-js"
-import type { TRPCClient } from "@trpc/client"
+import { TRPCClientError, type TRPCClient } from "@trpc/client"
 import {
   type ActorRefFrom,
+  and,
   assign,
   enqueueActions,
   fromPromise,
   or,
   setup,
-  stopChild,
+  stateIn,
 } from "xstate"
 import { z } from "zod"
 
@@ -46,6 +47,9 @@ interface Context extends Input {
   receiveFileRefs?: ActorRefFrom<typeof receiveFileActor>[]
   sendFileRefs?: ActorRefFrom<typeof sendFileActor>[]
   request?: Tables<"share_requests">
+  accepting?: boolean
+  responseAccepted?: boolean
+  watchFailed?: boolean
 }
 
 type Event =
@@ -64,6 +68,9 @@ type Event =
   | { type: "accept" }
   | { type: "decline" }
   | { type: "retry" }
+  | { type: "cancel" }
+  | { type: "retry-watcher" }
+  | { type: "dismiss-watcher" }
   | { type: "dismiss-error" }
   | { type: "clear-last-transfer" }
 
@@ -80,6 +87,18 @@ export const connectionMachine = setup({
     },
   },
   actions: {
+    stopWatchingRequest: enqueueActions(({ enqueue }) => {
+      enqueue.stopChild("listenToFileRequestResponseTable")
+      enqueue.assign({ watchFailed: false })
+    }),
+    watchRequest: enqueueActions(({ context, enqueue }) => {
+      enqueue.stopChild("listenToFileRequestResponseTable")
+      enqueue.assign({ watchFailed: false })
+      enqueue.spawnChild("listenToFileRequestResponseTable", {
+        id: "listenToFileRequestResponseTable",
+        input: { supabase: context.supabase, requestId: context.request!.id },
+      })
+    }),
     createPeerConnection: enqueueActions(({ enqueue }) => {
       const peerConnection = new RTCPeerConnection()
       enqueue.assign({ peerConnection })
@@ -125,6 +144,10 @@ export const connectionMachine = setup({
       requestPayload: undefined,
       request: undefined,
       remoteDeviceId: undefined,
+      accepting: undefined,
+      responseAccepted: undefined,
+      watchFailed: undefined,
+      dataChannels: undefined,
     }),
     spawnNextReceiveFile: assign({
       receiveFileRefs: ({ spawn, context, self }) => {
@@ -173,15 +196,15 @@ export const connectionMachine = setup({
         return [...(context.sendFileRefs || []), ref]
       },
     }),
-    stopReceiveFile: ({ context }) => {
+    stopReceiveFile: enqueueActions(({ context, enqueue }) => {
       const latestRef =
         context.receiveFileRefs?.[context.receiveFileRefs.length - 1]
-      if (latestRef) stopChild(latestRef)
-    },
-    stopSendFile: ({ context }) => {
+      if (latestRef) enqueue.stopChild(latestRef)
+    }),
+    stopSendFile: enqueueActions(({ context, enqueue }) => {
       const latestRef = context.sendFileRefs?.[context.sendFileRefs.length - 1]
-      if (latestRef) stopChild(latestRef)
-    },
+      if (latestRef) enqueue.stopChild(latestRef)
+    }),
     closeDataChannel: ({ context }) => {
       const latestChannel =
         context.dataChannels?.[context.dataChannels.length - 1]
@@ -205,27 +228,60 @@ export const connectionMachine = setup({
           requestPayload,
           trpcClient,
         },
+        signal,
       }) => {
         if (!requestId || !requestPayload)
           throw new Error("Request is not defined")
 
-        return trpcClient.shares.request.mutate({
-          requestId,
-          deviceId,
-          toPersonId: remoteUserId,
-          payload: requestPayload,
-        })
+        return trpcClient.shares.request.mutate(
+          {
+            requestId,
+            deviceId,
+            toPersonId: remoteUserId,
+            payload: requestPayload,
+          },
+          { signal },
+        )
       },
     ),
-    sendResponse: fromPromise(
-      async ({
-        input: { accept, context },
-      }: {
-        input: { context: Context; accept: boolean }
-      }) => sendResponse({ context, accept }),
+    sendResponse: fromPromise<
+      Tables<"share_request_responses">,
+      { context: Context; accept: boolean }
+    >(({ input: { accept, context }, signal }) =>
+      context.trpcClient.shares.respond.mutate(
+        {
+          requestId: context.request!.id,
+          accepted: accept,
+          deviceId: context.deviceId,
+        },
+        { signal },
+      ),
+    ),
+    cancelRequest: fromPromise<unknown, Context>(({ input, signal }) =>
+      input.trpcClient.shares.cancel.mutate(
+        { requestId: input.requestId! },
+        { signal },
+      ),
     ),
   },
   guards: {
+    watchingRequest: or([
+      stateIn("waiting for response"),
+      stateIn("connecting"),
+      stateIn("prompting user to accept connection"),
+      stateIn("receiving connection"),
+      stateIn("declining request"),
+      stateIn("decline failed"),
+      stateIn("receiving files"),
+    ]),
+    watchFailed: ({ context }) => !!context.watchFailed,
+    terminalShareError: (_, { error }: { error: unknown }) =>
+      error instanceof TRPCClientError &&
+      ["CONFLICT", "PRECONDITION_FAILED", "NOT_FOUND"].includes(
+        error.data?.code,
+      ),
+    cancellationGone: (_, { error }: { error: unknown }) =>
+      error instanceof TRPCClientError && error.data?.code === "NOT_FOUND",
     isFileDataChannel: (_, dataChannel: RTCDataChannel) =>
       dataChannel.label.startsWith("file:"),
     accepted: (
@@ -277,6 +333,7 @@ export const connectionMachine = setup({
 
   states: {
     idle: {
+      entry: "stopWatchingRequest",
       on: {
         "send-files": {
           target: "sending request",
@@ -290,6 +347,7 @@ export const connectionMachine = setup({
         "connection-request-received": {
           target: "prompting user to accept connection",
           actions: [
+            "clearLastTransfer",
             {
               type: "setRequest",
               params: ({ event }) => event.request,
@@ -297,6 +355,7 @@ export const connectionMachine = setup({
             assign({
               remoteDeviceId: ({ event }) => event.request.from_device_id,
             }),
+            "watchRequest",
           ],
         },
 
@@ -322,6 +381,7 @@ export const connectionMachine = setup({
         },
       },
       on: {
+        cancel: "cancelling request",
         "peer-connection.failed": {
           target: "idle",
           actions: ["closePeerConnection", "clearLastTransfer"],
@@ -346,7 +406,8 @@ export const connectionMachine = setup({
       on: {
         accept: {
           target: "receiving connection",
-          actions: "createPeerConnection",
+          guard: ({ context }) => !context.watchFailed,
+          actions: [assign({ accepting: true }), "createPeerConnection"],
         },
         decline: {
           target: "declining request",
@@ -373,10 +434,24 @@ export const connectionMachine = setup({
           on: { "signals.ready": "accepting request" },
         },
         "accepting request": {
+          after: { 15000: "acceptance failed" },
           invoke: {
             src: "sendResponse",
-            onDone: "connecting with caller",
-            onError: "acceptance failed",
+            onDone: {
+              target: "connecting with caller",
+              actions: assign({ responseAccepted: true }),
+            },
+            onError: [
+              {
+                guard: {
+                  type: "terminalShareError",
+                  params: ({ event }) => ({ error: event.error }),
+                },
+                target: "#connection.idle",
+                actions: ["closePeerConnection", "clearLastTransfer"],
+              },
+              { target: "acceptance failed" },
+            ],
             input: ({ context }) => ({ context, accept: true }),
           },
         },
@@ -400,10 +475,13 @@ export const connectionMachine = setup({
         "peer.datachannel": {
           target: "receiving files",
 
-          actions: {
-            type: "setDataChannelToContext",
-            params: ({ event }) => event.event.channel,
-          },
+          actions: [
+            assign({ responseAccepted: true }),
+            {
+              type: "setDataChannelToContext",
+              params: ({ event }) => event.event.channel,
+            },
+          ],
 
           guard: {
             type: "isFileDataChannel",
@@ -414,6 +492,7 @@ export const connectionMachine = setup({
     },
 
     "sending request": {
+      after: { 15000: "request failed" },
       invoke: {
         src: "sendRequest",
         id: "sendRequest",
@@ -422,40 +501,46 @@ export const connectionMachine = setup({
 
         onDone: {
           target: "waiting for response",
-          actions: {
-            type: "setRequest",
-            params: ({ event }) => event.output,
-          },
+          actions: [
+            {
+              type: "setRequest",
+              params: ({ event }) => event.output,
+            },
+            "watchRequest",
+          ],
         },
-        onError: "request failed",
+        onError: [
+          {
+            guard: {
+              type: "terminalShareError",
+              params: ({ event }) => ({ error: event.error }),
+            },
+            target: "idle",
+            actions: ["closePeerConnection", "clearLastTransfer"],
+          },
+          { target: "request failed" },
+        ],
       },
     },
 
     "request failed": {
       on: {
         retry: "sending request",
-        "dismiss-error": { target: "idle", actions: "clearLastTransfer" },
+        cancel: "cancelling request",
+        "dismiss-error": "cancelling request",
       },
     },
 
     "waiting for response": {
-      invoke: {
-        src: "listenToFileRequestResponseTable",
-        id: "listenToFileRequestResponseTable",
-
-        input: ({ context }) => ({
-          supabase: context.supabase,
-          requestId: context.request!.id,
-        }),
-      },
-
       on: {
+        cancel: "cancelling request",
         "file-request-response.failed": "request failed",
         "file-request-response": [
           {
             target: "connecting",
             actions: [
               assign({
+                responseAccepted: true,
                 remoteDeviceId: ({ event }) =>
                   event.response.accepted_by_device_id!,
               }),
@@ -465,17 +550,29 @@ export const connectionMachine = setup({
           },
           {
             target: "idle",
+            actions: "clearLastTransfer",
           },
         ],
       },
     },
 
     "declining request": {
+      after: { 15000: "decline failed" },
       invoke: {
         src: "sendResponse",
         input: ({ context }) => ({ context, accept: false }),
         onDone: { target: "idle", actions: "clearLastTransfer" },
-        onError: "decline failed",
+        onError: [
+          {
+            guard: {
+              type: "terminalShareError",
+              params: ({ event }) => ({ error: event.error }),
+            },
+            target: "idle",
+            actions: "clearLastTransfer",
+          },
+          { target: "decline failed" },
+        ],
       },
     },
 
@@ -486,7 +583,36 @@ export const connectionMachine = setup({
       },
     },
 
+    "cancelling request": {
+      entry: ["closePeerConnection", "stopWatchingRequest"],
+      after: { 15000: "cancellation failed" },
+      invoke: {
+        src: "cancelRequest",
+        input: ({ context }) => context,
+        onDone: { target: "idle", actions: "clearLastTransfer" },
+        onError: [
+          {
+            guard: {
+              type: "cancellationGone",
+              params: ({ event }) => ({ error: event.error }),
+            },
+            target: "idle",
+            actions: "clearLastTransfer",
+          },
+          { target: "cancellation failed" },
+        ],
+      },
+      on: { "dismiss-error": { target: "idle", actions: "clearLastTransfer" } },
+    },
+    "cancellation failed": {
+      on: {
+        retry: "cancelling request",
+        "dismiss-error": { target: "idle", actions: "clearLastTransfer" },
+      },
+    },
+
     "sending files": {
+      entry: "stopWatchingRequest",
       states: {
         "sending file": {
           exit: "stopSendFile",
@@ -520,6 +646,12 @@ export const connectionMachine = setup({
     },
 
     "receiving files": {
+      on: {
+        "dismiss-watcher": {
+          guard: "watchFailed",
+          actions: assign({ watchFailed: false }),
+        },
+      },
       states: {
         "receiving file": {
           on: {
@@ -563,18 +695,52 @@ export const connectionMachine = setup({
       initial: "receiving file",
     },
   },
+  on: {
+    "file-request.cancelled": {
+      guard: ({ context, event }) => context.request?.id === event.requestId,
+      target: ".idle",
+      actions: ["closeDataChannel", "closePeerConnection", "clearLastTransfer"],
+    },
+    "file-request.expired": {
+      guard: ({ context, event }) =>
+        context.request?.id === event.requestId && !context.responseAccepted,
+      target: ".idle",
+      actions: ["closePeerConnection", "clearLastTransfer"],
+    },
+    "file-request-response": [
+      {
+        guard: ({ context, event }) =>
+          !context.filesToSend &&
+          context.request?.id === event.response.request_id &&
+          context.accepting === true &&
+          event.response.accepted &&
+          event.response.accepted_by_device_id === context.deviceId,
+        actions: assign({ responseAccepted: true }),
+      },
+      {
+        guard: ({ context, event }) =>
+          !context.filesToSend &&
+          context.request?.id === event.response.request_id,
+        target: ".idle",
+        actions: [
+          "closeDataChannel",
+          "closePeerConnection",
+          "clearLastTransfer",
+        ],
+      },
+    ],
+    "file-request-response.failed": {
+      guard: "watchingRequest",
+      actions: assign({ watchFailed: true }),
+    },
+    "retry-watcher": {
+      guard: and(["watchingRequest", "watchFailed"]),
+      actions: "watchRequest",
+    },
+    "dismiss-watcher": {
+      guard: and(["watchingRequest", "watchFailed"]),
+      target: ".idle",
+      actions: ["closeDataChannel", "closePeerConnection", "clearLastTransfer"],
+    },
+  },
 })
-
-async function sendResponse({
-  accept,
-  context,
-}: {
-  context: Context
-  accept: boolean
-}) {
-  return context.trpcClient.shares.respond.mutate({
-    requestId: context.request!.id,
-    accepted: accept,
-    deviceId: context.deviceId,
-  })
-}

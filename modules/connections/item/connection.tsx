@@ -12,6 +12,7 @@ import { createClient } from "@/utils/supabase/client"
 import { FileTransferRequestDialog } from "./file-transfer-request-dialog"
 import { FilesList } from "./files-list"
 import { connectionMachine } from "./machine"
+import { RequestControls } from "./request-controls"
 import { Button } from "../../../components/ui/button"
 import { useRequiredUser } from "../../auth/use-user"
 import { DeleteConnection } from "../delete-connection"
@@ -163,39 +164,19 @@ function ConnectionContent({
 
         <input {...getInputProps({ className: "hidden" })} />
 
-        {state.value === "prompting user to accept connection" && (
-          <FileTransferRequestDialog
-            state={state}
-            send={send}
-            remoteUser={remoteUser}
-          />
-        )}
+        {state.value === "prompting user to accept connection" &&
+          !state.context.watchFailed && (
+            <FileTransferRequestDialog
+              state={state}
+              send={send}
+              remoteUser={remoteUser}
+            />
+          )}
       </div>
 
       <FilesList actor={actor} />
 
-      {(state.value === "request failed" ||
-        state.matches({ "receiving connection": "acceptance failed" }) ||
-        state.value === "decline failed") && (
-        <div role="alert" className="flex-row items-center gap-2 text-sm">
-          <span>
-            {state.value === "request failed" ?
-              "Could not complete the file request."
-            : state.matches({ "receiving connection": "acceptance failed" }) ?
-              "Could not accept the file request."
-            : "Could not decline the file request."}
-          </span>
-          <Button variant="outline" onClick={() => send({ type: "retry" })}>
-            Retry
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => send({ type: "dismiss-error" })}
-          >
-            Dismiss
-          </Button>
-        </div>
-      )}
+      <RequestControls state={state} send={send} />
 
       <div className="flex-row-reverse gap-3">
         <DeleteConnection remotePersonId={remoteUserId} />

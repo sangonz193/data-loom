@@ -335,6 +335,182 @@ integrationTest(
       await receiverSubscriber.realtime.setAuth(
         receiverSession.session.access_token,
       )
+
+      for (const decision of ["accept", "decline", "cancel"] as const) {
+        const fanoutRequest = await sender.shares.request({
+          ...requestInput,
+          requestId: crypto.randomUUID(),
+        })
+        let receiverStarts = 0
+        let receiverStops = 0
+        let closedPeers = 0
+        const responseAttempts: unknown[] = []
+        const fanoutMachine = connectionMachine.provide({
+          actions: {
+            createPeerConnection: assign({
+              peerConnection: () =>
+                ({
+                  close: () => {
+                    closedPeers++
+                  },
+                }) as RTCPeerConnection,
+            }),
+          },
+          actors: {
+            connectReceiverPeerMachine: fromCallback(({ sendBack }) => {
+              receiverStarts++
+              sendBack({ type: "signals.ready" })
+              return () => {
+                receiverStops++
+              }
+            }) as never,
+          },
+        })
+        const recipients = [recipientDevice, recipientSecondDevice].map(
+          (deviceId) =>
+            createActor(fanoutMachine, {
+              input: {
+                currentUser: authUsers[1]!,
+                remoteUserId: senderId,
+                deviceId,
+                supabase: receiverSubscriber,
+                trpcClient: {
+                  shares: {
+                    respond: {
+                      mutate: async (
+                        input: Parameters<typeof recipient.shares.respond>[0],
+                      ) => {
+                        const result = await recipient.shares.respond(input)
+                        responseAttempts.push(result)
+                        if (responseAttempts.length === 1)
+                          throw new Error("HTTP acknowledgment lost")
+                        return result
+                      },
+                    },
+                  },
+                } as never,
+              },
+            }).start(),
+        )
+        const [owner, sibling] = recipients
+        if (!owner || !sibling) throw new Error("Missing recipient")
+        try {
+          for (const actor of recipients)
+            actor.send({
+              type: "connection-request-received",
+              request: fanoutRequest,
+            })
+          const channels = receiverSubscriber
+            .getChannels()
+            .filter((channel) => channel.topic.includes(fanoutRequest.id))
+          expect(channels).toHaveLength(2)
+          expect(channels[0]!.topic).not.toBe(channels[1]!.topic)
+          if (decision === "cancel") {
+            await sender.shares.cancel({ requestId: fanoutRequest.id })
+          } else {
+            owner.send({ type: decision })
+          }
+          await waitFor(sibling, (state) => state.matches("idle"), {
+            timeout: 10_000,
+          })
+          expect(sibling.getSnapshot().context.request).toBeUndefined()
+          if (decision === "accept") {
+            await waitFor(
+              owner,
+              (state) =>
+                state.context.responseAccepted === true &&
+                state.matches({ "receiving connection": "acceptance failed" }),
+              { timeout: 10_000 },
+            )
+            expect(receiverStarts).toBe(1)
+            expect(receiverStops).toBe(0)
+            const receiver =
+              owner.getSnapshot().children.connectReceiverPeerMachine
+            owner.send({ type: "retry" })
+            await waitFor(
+              owner,
+              (state) =>
+                state.matches({
+                  "receiving connection": "connecting with caller",
+                }),
+              { timeout: 5_000 },
+            )
+            expect(
+              owner.getSnapshot().children.connectReceiverPeerMachine,
+            ).toBe(receiver!)
+            expect(responseAttempts).toHaveLength(2)
+            expect(responseAttempts[1]).toEqual(responseAttempts[0])
+            const remaining = receiverSubscriber
+              .getChannels()
+              .filter((channel) => channel.topic.includes(fanoutRequest.id))
+            expect(remaining).toHaveLength(1)
+            await sender.shares.cancel({ requestId: fanoutRequest.id })
+            await waitFor(owner, (state) => state.matches("idle"), {
+              timeout: 10_000,
+            })
+            expect(receiverStops).toBe(1)
+            expect(closedPeers).toBe(1)
+          } else {
+            await waitFor(owner, (state) => state.matches("idle"), {
+              timeout: 10_000,
+            })
+          }
+          expect(owner.getSnapshot().context.request).toBeUndefined()
+          expect(
+            receiverSubscriber
+              .getChannels()
+              .filter((channel) => channel.topic.includes(fanoutRequest.id)),
+          ).toHaveLength(0)
+        } finally {
+          for (const actor of recipients) actor.stop()
+        }
+      }
+
+      const cancelledBeforeReplay = await sender.shares.request({
+        ...requestInput,
+        requestId: crypto.randomUUID(),
+      })
+      await recipient.shares.respond({
+        requestId: cancelledBeforeReplay.id,
+        deviceId: recipientDevice,
+        accepted: true,
+      })
+      await sender.shares.cancel({ requestId: cancelledBeforeReplay.id })
+      let callerStarts = 0
+      const replay = createActor(
+        connectionMachine.provide({
+          actions: { createPeerConnection: () => {} },
+          actors: {
+            sendRequest: fromPromise(async () => cancelledBeforeReplay),
+            connectCallerPeerMachine: fromCallback(() => {
+              callerStarts++
+            }) as never,
+          },
+        }),
+        {
+          input: {
+            currentUser: authUsers[0]!,
+            remoteUserId: recipientId,
+            deviceId: senderDevice,
+            supabase: subscriber,
+            trpcClient: {} as never,
+          },
+        },
+      ).start()
+      try {
+        replay.send({
+          type: "send-files",
+          files: [new File(["data"], "a.txt")],
+        })
+        await waitFor(replay, (state) => state.matches("idle"), {
+          timeout: 10_000,
+        })
+        expect(callerStarts).toBe(0)
+        expect(replay.getSnapshot().context.request).toBeUndefined()
+      } finally {
+        replay.stop()
+      }
+
       const incomingRequest = await sender.shares.request({
         ...requestInput,
         requestId: crypto.randomUUID(),

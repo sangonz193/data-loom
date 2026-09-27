@@ -23,6 +23,7 @@ const input = {
 
 const request = {
   id: "request-a",
+  from_device_id: "55555555-5555-4555-8555-555555555555",
   payload: { files: [] },
 } as unknown as Tables<"share_requests">
 
@@ -54,11 +55,13 @@ for (const accepted of [true, false]) {
       const channel = {
         on: (
           _event: string,
-          filter: { filter: string },
+          filter: { filter: string; table: string },
           callback: typeof onInsert,
         ) => {
-          expect(filter.filter).toBe(`request_id=eq.${[...requests.keys()][0]}`)
-          onInsert = callback
+          expect(filter.filter).toBe(
+            `${filter.table === "share_requests" ? "id" : "request_id"}=eq.${[...requests.keys()][0]}`,
+          )
+          if (filter.table === "share_request_responses") onInsert = callback
           return channel
         },
         subscribe: (callback: typeof onStatus) => {
@@ -88,7 +91,25 @@ for (const accepted of [true, false]) {
           ...input,
           supabase: {
             channel: () => channel,
-            from: () => query,
+            from: (table: string) =>
+              table === "share_requests" ?
+                {
+                  ...query,
+                  select() {
+                    return this
+                  },
+                  eq() {
+                    return this
+                  },
+                  abortSignal() {
+                    return this
+                  },
+                  maybeSingle: async () => ({
+                    data: [...requests.values()][0],
+                    error: null,
+                  }),
+                }
+              : query,
             removeChannel: () => {
               removed = true
             },
@@ -146,8 +167,9 @@ for (const accepted of [true, false]) {
       expect(attempts).toHaveLength(2)
       expect(attempts[1]).toEqual(attempts[0])
       expect(requests.size).toBe(1)
-      expect(removed).toBe(true)
+      expect(removed).toBe(!accepted)
       actor.stop()
+      expect(removed).toBe(true)
     })
   }
 }
@@ -202,6 +224,7 @@ for (const [action, failedState, pendingState] of [
     const machine = connectionMachine.provide({
       actions: { createPeerConnection: () => undefined },
       actors: {
+        listenToFileRequestResponseTable: fromCallback(() => {}),
         connectReceiverPeerMachine: fromCallback(({ sendBack }) => {
           sendBack({ type: "signals.ready" })
         }) as unknown as typeof connectReceiverPeerMachine,
@@ -252,6 +275,7 @@ for (const action of ["send-files", "accept", "decline"] as const) {
         },
       },
       actors: {
+        listenToFileRequestResponseTable: fromCallback(() => {}),
         connectReceiverPeerMachine: fromCallback(({ sendBack }) => {
           sendBack({ type: "signals.ready" })
         }) as never,
@@ -267,6 +291,7 @@ for (const action of ["send-files", "accept", "decline"] as const) {
                 throw new Error("Unavailable")
               },
             },
+            cancel: { mutate: async () => undefined },
             respond: {
               mutate: async () => {
                 throw new Error("Unavailable")
@@ -285,10 +310,11 @@ for (const action of ["send-files", "accept", "decline"] as const) {
     }
     await settle()
     actor.send({ type: "dismiss-error" })
+    await settle()
     expectActiveState(actor, "idle")
     expect(actor.getSnapshot().context.filesToSend).toBeUndefined()
     expect(actor.getSnapshot().context.request).toBeUndefined()
-    expect(closedPeers).toBe(action === "accept" ? 1 : 0)
+    expect(closedPeers).toBe(action === "decline" ? 0 : 1)
     actor.stop()
   })
 }
@@ -305,6 +331,7 @@ test("a failed receiver signal returns the share connection to idle", async () =
       createPeerConnection: assign({ peerConnection: () => peerConnection }),
     },
     actors: {
+      listenToFileRequestResponseTable: fromCallback(() => {}),
       sendResponse: fromPromise(async () => undefined) as never,
       connectReceiverPeerMachine: fromCallback(({ sendBack }) => {
         sendBack({ type: "signals.ready" })
@@ -381,7 +408,10 @@ test("a failed caller signal returns the share connection to idle", async () => 
   actor.stop()
 })
 
-function createReceiverHarness() {
+function createReceiverHarness(
+  deviceId = input.deviceId,
+  requestId = request.id,
+) {
   const remotePersonId = "44444444-4444-4444-8444-444444444444"
   const remoteDeviceId = "55555555-5555-4555-8555-555555555555"
   const responses = [] as {
@@ -391,7 +421,7 @@ function createReceiverHarness() {
   const persisted = new Map<string, boolean>()
   const peerConnection = {
     remoteDescription: null as RTCSessionDescriptionInit | null,
-    localDescription: { type: "answer", sdp: "answer" },
+    localDescription: { type: "answer" as const, sdp: "answer" },
     setRemoteDescription: mock(async (offer: RTCSessionDescriptionInit) => {
       peerConnection.remoteDescription = offer
     }),
@@ -429,6 +459,7 @@ function createReceiverHarness() {
       }),
     },
     actors: {
+      listenToFileRequestResponseTable: fromCallback(() => {}),
       receiveFile: fromPromise(() => transfer.promise) as never,
     },
   })
@@ -436,6 +467,7 @@ function createReceiverHarness() {
     input: {
       ...input,
       remoteUserId: remotePersonId,
+      deviceId,
       supabase: supabase as never,
       trpcClient: {
         shares: {
@@ -458,6 +490,7 @@ function createReceiverHarness() {
     request: {
       ...request,
       from_device_id: remoteDeviceId,
+      id: requestId,
       payload: { files: [{ name: "a.txt", size: 4, mimeType: "text/plain" }] },
     },
   })
@@ -473,13 +506,13 @@ function createReceiverHarness() {
     sendSignal,
     transfer,
     ready: (status = "SUBSCRIBED") => onStatus(status),
-    offer: () => {
+    offer: (offer = { type: "offer", sdp: "one-shot offer" }) => {
       if (listening)
         onBroadcast({
           payload: {
             fromPersonId: remotePersonId,
             fromDeviceId: remoteDeviceId,
-            payload: { type: "offer", sdp: "one-shot offer" },
+            payload: offer,
           },
         })
     },
@@ -493,6 +526,188 @@ function createReceiverHarness() {
     },
   }
 }
+
+test("caller watcher retry preserves the delivered offer and connects to the original receiver", async () => {
+  const receiverDeviceId = "33333333-3333-4333-8333-333333333333"
+  const receiverPersonId = "44444444-4444-4444-8444-444444444444"
+  const peer = Object.assign(new EventTarget(), {
+    connectionState: "new",
+    remoteDescription: null as RTCSessionDescriptionInit | null,
+    localDescription: { type: "offer" as const, sdp: "one-shot offer" },
+    setLocalDescription: mock(async () => {}),
+    setRemoteDescription: mock(async (answer: RTCSessionDescriptionInit) => {
+      peer.remoteDescription = answer
+    }),
+    createDataChannel: mock(() => ({ close: mock(() => {}) })),
+    close: mock(() => {}),
+  })
+  const createPeer = mock(() => peer as unknown as RTCPeerConnection)
+  let onStatus: (status: string) => void = () => {}
+  let onBroadcast: (event: { payload: unknown }) => void = () => {}
+  const channel = {
+    on: (_type: string, _filter: unknown, callback: typeof onBroadcast) => {
+      onBroadcast = callback
+      return channel
+    },
+    subscribe: (callback: typeof onStatus) => {
+      onStatus = callback
+      return channel
+    },
+  }
+  const supabase = {
+    channel: mock(() => channel),
+    removeChannel: mock(() => {}),
+  }
+  const watchers: { stop: ReturnType<typeof mock>; fail: () => void }[] = []
+  const sendRequest = mock(async ({ requestId }: { requestId: string }) => ({
+    ...request,
+    id: requestId,
+  }))
+  const sendSignal = mock(
+    async (signal: {
+      deviceId: string
+      toDeviceId: string
+      payload: { type: string; sdp: string }
+    }) => {
+      expect(signal.deviceId).toBe(request.from_device_id)
+      expect(signal.toDeviceId).toBe(receiverDeviceId)
+      receiver.offer(signal.payload)
+    },
+  )
+  const transfer = Promise.withResolvers<void>()
+  const actor = createActor(
+    connectionMachine.provide({
+      actions: { createPeerConnection: assign({ peerConnection: createPeer }) },
+      actors: {
+        listenToFileRequestResponseTable: fromCallback(({ sendBack }) => {
+          const stop = mock(() => {})
+          watchers.push({
+            stop,
+            fail: () => sendBack({ type: "file-request-response.failed" }),
+          })
+          return stop
+        }),
+        sendFile: fromPromise(() => transfer.promise) as never,
+      },
+    }),
+    {
+      input: {
+        ...input,
+        deviceId: request.from_device_id,
+        remoteUserId: receiverPersonId,
+        supabase: supabase as never,
+        trpcClient: {
+          shares: { request: { mutate: sendRequest } },
+          signals: { send: { mutate: sendSignal } },
+        } as never,
+      },
+    },
+  ).start()
+  actor.send({ type: "send-files", files: [new File(["data"], "a.txt")] })
+  await settle()
+  const requestId = actor.getSnapshot().context.requestId!
+  const receiver = createReceiverHarness(receiverDeviceId, requestId)
+  const answerReady = Promise.withResolvers<void>()
+  receiver.peerConnection.setLocalDescription.mockImplementation(
+    () => answerReady.promise,
+  )
+  receiver.sendSignal.mockImplementation(async (value) => {
+    const signal = value as {
+      deviceId: string
+      toDeviceId: string
+      payload: unknown
+    }
+    expect(signal.deviceId).toBe(receiverDeviceId)
+    expect(signal.toDeviceId).toBe(request.from_device_id)
+    onBroadcast({
+      payload: {
+        fromPersonId: receiverPersonId,
+        fromDeviceId: signal.deviceId,
+        payload: signal.payload,
+      },
+    })
+  })
+  try {
+    receiver.ready()
+    receiver.responses[0]!.acknowledgment.resolve()
+    await settle()
+    const response = {
+      request_id: requestId,
+      accepted: true,
+      accepted_by_device_id: receiverDeviceId,
+      created_at: new Date().toISOString(),
+    }
+    actor.send({ type: "file-request-response", response })
+    onStatus("SUBSCRIBED")
+    await settle()
+    await settle()
+    expect(receiver.peerConnection.remoteDescription).toEqual(
+      peer.localDescription,
+    )
+    expect(receiver.sendSignal).not.toHaveBeenCalled()
+    const callerRef = actor.getSnapshot().children.connectCallerPeerMachine
+    const receiverRef =
+      receiver.actor.getSnapshot().children.connectReceiverPeerMachine
+    const watcherRef =
+      actor.getSnapshot().children.listenToFileRequestResponseTable
+    watchers[0]!.fail()
+    expectActiveState(actor, "connecting")
+    expect(actor.getSnapshot().context.watchFailed).toBe(true)
+    expect(actor.getSnapshot().can({ type: "cancel" })).toBe(true)
+    actor.send({ type: "retry-watcher" })
+    actor.send({ type: "file-request-response", response })
+    actor.send({ type: "file-request.expired", requestId })
+    expectActiveState(actor, "connecting")
+    expect(actor.getSnapshot().context.watchFailed).toBe(false)
+    expect(actor.getSnapshot().context.remoteDeviceId).toBe(receiverDeviceId)
+    expect(actor.getSnapshot().context.peerConnection).toBe(
+      peer as unknown as RTCPeerConnection,
+    )
+    expect(actor.getSnapshot().children.connectCallerPeerMachine).toBe(
+      callerRef!,
+    )
+    expect(
+      receiver.actor.getSnapshot().children.connectReceiverPeerMachine,
+    ).toBe(receiverRef!)
+    expect(
+      actor.getSnapshot().children.listenToFileRequestResponseTable,
+    ).not.toBe(watcherRef!)
+    expect(watchers).toHaveLength(2)
+    expect(watchers[0]!.stop).toHaveBeenCalledTimes(1)
+    expect(createPeer).toHaveBeenCalledTimes(1)
+    expect(peer.close).not.toHaveBeenCalled()
+    expect(sendRequest).toHaveBeenCalledTimes(1)
+    expect(sendSignal).toHaveBeenCalledTimes(1)
+    expect(supabase.channel).toHaveBeenCalledTimes(1)
+    expect(supabase.removeChannel).not.toHaveBeenCalled()
+    expect(receiver.supabase.removeChannel).not.toHaveBeenCalled()
+    answerReady.resolve()
+    await settle()
+    expect(peer.remoteDescription).toEqual(
+      receiver.peerConnection.localDescription,
+    )
+    expect(receiver.peerConnection.setRemoteDescription).toHaveBeenCalledTimes(
+      1,
+    )
+    expect(receiver.peerConnection.close).not.toHaveBeenCalled()
+    peer.connectionState = "connected"
+    peer.dispatchEvent(new Event("connectionstatechange"))
+    receiver.dataChannel()
+    expect(actor.getSnapshot().matches("sending files")).toBe(true)
+    expect(receiver.actor.getSnapshot().matches("receiving files")).toBe(true)
+    transfer.resolve()
+    receiver.transfer.resolve()
+    await settle()
+    expectActiveState(actor, "files sent")
+    expectActiveState(receiver.actor, "idle")
+    expect(watchers[1]!.stop).toHaveBeenCalledTimes(1)
+    expect(supabase.removeChannel).toHaveBeenCalledTimes(1)
+    expect(receiver.supabase.removeChannel).toHaveBeenCalledTimes(1)
+  } finally {
+    actor.stop()
+    receiver.actor.stop()
+  }
+})
 
 test("acceptance waits for receiver subscription readiness", async () => {
   const harness = createReceiverHarness()

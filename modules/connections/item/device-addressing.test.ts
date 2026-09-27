@@ -62,6 +62,7 @@ test("receiver pins the requesting device before acceptance and clears it with t
       }),
     },
     actors: {
+      listenToFileRequestResponseTable: fromCallback(() => {}),
       connectReceiverPeerMachine: fromCallback(({ input, sendBack }) => {
         receiverInput = input
         sendBack({ type: "signals.ready" })
