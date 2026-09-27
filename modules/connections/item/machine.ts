@@ -37,6 +37,7 @@ type Input = {
 }
 
 interface Context extends Input {
+  remoteDeviceId?: string
   filesToSend?: File[]
   peerConnection?: RTCPeerConnection
   dataChannels?: RTCDataChannel[]
@@ -112,6 +113,7 @@ export const connectionMachine = setup({
       sendFileRefs: undefined,
       filesToSend: undefined,
       request: undefined,
+      remoteDeviceId: undefined,
     }),
     spawnNextReceiveFile: assign({
       receiveFileRefs: ({ spawn, context, self }) => {
@@ -214,7 +216,7 @@ export const connectionMachine = setup({
     isFileDataChannel: (_, dataChannel: RTCDataChannel) =>
       dataChannel.label.startsWith("file:"),
     accepted: (_, event: ListenToFileRequestResponseTableOutputEvent) =>
-      event.response.accepted,
+      event.response.accepted && event.response.accepted_by_device_id != null,
     peerConnectionIsClosed: ({ context }) =>
       context.peerConnection?.connectionState === "closed",
     peerConnectionIsDisconnected: ({ context }) =>
@@ -273,6 +275,9 @@ export const connectionMachine = setup({
               type: "setRequest",
               params: ({ event }) => event.request,
             },
+            assign({
+              remoteDeviceId: ({ event }) => event.request.from_device_id,
+            }),
           ],
         },
 
@@ -290,6 +295,7 @@ export const connectionMachine = setup({
         input: ({ context }) => ({
           ...context,
           peerConnection: context.peerConnection!,
+          remoteDeviceId: context.remoteDeviceId!,
         }),
 
         onDone: {
@@ -343,6 +349,7 @@ export const connectionMachine = setup({
         input: ({ context }) => ({
           ...context,
           peerConnection: context.peerConnection!,
+          remoteDeviceId: context.remoteDeviceId!,
         }),
       },
 
@@ -399,7 +406,13 @@ export const connectionMachine = setup({
         "file-request-response": [
           {
             target: "connecting",
-            actions: "createPeerConnection",
+            actions: [
+              assign({
+                remoteDeviceId: ({ event }) =>
+                  event.response.accepted_by_device_id!,
+              }),
+              "createPeerConnection",
+            ],
             guard: { type: "accepted", params: ({ event }) => event },
           },
           {

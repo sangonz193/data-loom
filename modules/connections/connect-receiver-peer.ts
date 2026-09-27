@@ -20,6 +20,7 @@ type Input = {
   supabase: SupabaseClient<Database>
   currentUser: User
   remoteUserId: string
+  remoteDeviceId?: string
   deviceId: string
   trpcClient: TRPCClient<AppRouter>
   offer?: RTCSessionDescriptionInit
@@ -51,13 +52,14 @@ export const connectReceiverPeerMachine = setup({
       answer: (_, answer: RTCSessionDescriptionInit) => answer,
     }),
     sendAnswer: (
-      { context: { remoteUserId, trpcClient }, self },
+      { context: { deviceId, remoteDeviceId, trpcClient }, self },
       answer: RTCSessionDescriptionInit,
     ) => {
       logger.info("[connectReceiverPeerMachine] sending answer", answer)
       trpcClient.signals.send
         .mutate({
-          toPersonId: remoteUserId,
+          deviceId,
+          toDeviceId: remoteDeviceId!,
           payload: answer as { type: "answer"; sdp: string },
         })
         .catch((error) => {
@@ -69,7 +71,7 @@ export const connectReceiverPeerMachine = setup({
         })
     },
     sendIceCandidate: (
-      { context: { remoteUserId, trpcClient }, self },
+      { context: { deviceId, remoteDeviceId, trpcClient }, self },
       candidate: RTCIceCandidate,
     ) => {
       logger.info(
@@ -78,7 +80,8 @@ export const connectReceiverPeerMachine = setup({
       )
       trpcClient.signals.send
         .mutate({
-          toPersonId: remoteUserId,
+          deviceId,
+          toDeviceId: remoteDeviceId!,
           payload: { ...candidate.toJSON(), candidate: candidate.candidate },
         })
         .catch((error) => {
@@ -177,14 +180,17 @@ export const connectReceiverPeerMachine = setup({
     },
 
     "signals.offer": {
-      actions: sendTo(
-        "connectPeer",
-        ({ event }) =>
-          ({
-            type: "description-received",
-            description: event.offer,
-          }) satisfies ConnectPeerInputEvent,
-      ),
+      actions: [
+        assign({ remoteDeviceId: ({ event }) => event.fromDeviceId }),
+        sendTo(
+          "connectPeer",
+          ({ event }) =>
+            ({
+              type: "description-received",
+              description: event.offer,
+            }) satisfies ConnectPeerInputEvent,
+        ),
+      ],
     },
 
     "peer-connection.successful": ".done",

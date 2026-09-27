@@ -1,6 +1,7 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js"
 import type { TRPCClient } from "@trpc/client"
 import { assign, fromCallback, fromPromise, setup } from "xstate"
+import { z } from "zod"
 
 import { logger } from "@/logger"
 import type { AppRouter } from "@/modules/api/router"
@@ -23,6 +24,7 @@ interface Context extends Input {
     ReturnType<TRPCClient<AppRouter>["pairing"]["create"]["mutate"]>
   >
   redeemCode?: string
+  remoteDeviceId?: string
   remoteUserId?: string
   peerConnection?: RTCPeerConnection
   isRedemptionListenerReady?: boolean
@@ -41,6 +43,7 @@ type Event =
   | {
       type: "redemption-received"
       remoteUserId: string
+      remoteDeviceId: string
     }
   | {
       type: "redemption-listener.ready"
@@ -49,6 +52,12 @@ type Event =
       type: "redeem-code"
       code: string
     }
+
+const redemptionSchema = z.object({
+  code: z.string(),
+  remotePersonId: z.uuid(),
+  remoteDeviceId: z.uuid(),
+})
 
 export const newConnectionMachine = setup({
   types: {
@@ -96,18 +105,12 @@ export const newConnectionMachine = setup({
       const channel = supabase
         .channel(`device:${deviceId}`, { config: { private: true } })
         .on("broadcast", { event: "pairing-redemption" }, ({ payload }) => {
-          const redemption = payload as {
-            code?: string
-            remotePersonId?: string
-          }
-          if (
-            redemption.code !== createdCode?.code ||
-            !redemption.remotePersonId
-          )
-            return
+          const parsed = redemptionSchema.safeParse(payload)
+          if (!parsed.success || parsed.data.code !== createdCode?.code) return
           sendBack({
             type: "redemption-received",
-            remoteUserId: redemption.remotePersonId,
+            remoteUserId: parsed.data.remotePersonId,
+            remoteDeviceId: parsed.data.remoteDeviceId,
           })
         })
         .subscribe((status, err) => {
@@ -140,6 +143,7 @@ export const newConnectionMachine = setup({
     notifyPairingOwner: fromPromise(({ input }: { input: Context }) =>
       input.trpcClient.pairing.notifyRedeemed.mutate({
         code: input.redeemCode!,
+        deviceId: input.deviceId,
       }),
     ),
     cleanup: fromCallback(({ input }: { input: Context }) => {
@@ -208,6 +212,7 @@ export const newConnectionMachine = setup({
               type: "saveRemoteUserIdToContext",
               params: ({ event }) => event.remoteUserId,
             },
+            assign({ remoteDeviceId: ({ event }) => event.remoteDeviceId }),
             "createPeer",
           ],
         },
@@ -223,6 +228,7 @@ export const newConnectionMachine = setup({
           ...context,
           peerConnection: context.peerConnection!,
           remoteUserId: context.remoteUserId!,
+          remoteDeviceId: context.remoteDeviceId!,
         }),
 
         onDone: {

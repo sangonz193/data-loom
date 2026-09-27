@@ -58,7 +58,10 @@ test("a failed caller signal returns the share connection to idle", async () => 
       listenToFileRequestResponseTable: fromCallback(({ sendBack }) => {
         sendBack({
           type: "file-request-response",
-          response: { accepted: true },
+          response: {
+            accepted: true,
+            accepted_by_device_id: "receiver-device",
+          },
         })
       }) as never,
       connectCallerPeerMachine: fromCallback(() => () => undefined) as never,

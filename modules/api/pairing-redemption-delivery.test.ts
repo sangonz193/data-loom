@@ -4,7 +4,11 @@ import type { createAdminClient } from "@/utils/supabase/admin"
 
 import { sendPairingRedemption } from "./pairing-redemption-delivery"
 
-const payload = { remotePersonId: "redeemer", code: "PAIRCODE" }
+const payload = {
+  remotePersonId: "redeemer",
+  remoteDeviceId: "redeemer-device",
+  code: "PAIRCODE",
+}
 
 for (const outcome of ["success", "rejected", "timed out"] as const) {
   test(`pairing notification ${outcome} cleans up its send-only channel`, async () => {

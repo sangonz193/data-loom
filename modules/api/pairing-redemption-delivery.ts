@@ -3,7 +3,7 @@ import type { createAdminClient } from "@/utils/supabase/admin"
 export async function sendPairingRedemption(
   admin: ReturnType<typeof createAdminClient>,
   deviceIds: string[],
-  payload: { remotePersonId: string; code: string },
+  payload: { remotePersonId: string; remoteDeviceId: string; code: string },
 ) {
   await Promise.all(
     deviceIds.map(async (deviceId) => {

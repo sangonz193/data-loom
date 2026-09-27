@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import { expect, test } from "bun:test"
 import { subMinutes } from "date-fns"
 
@@ -22,10 +22,7 @@ integrationTest(
         admin.auth.admin.createUser({ email, password, email_confirm: true }),
       ),
     )
-    let channel:
-      | ReturnType<ReturnType<typeof createClient>["channel"]>
-      | undefined
-    let subscriber: ReturnType<typeof createClient> | undefined
+    const subscribers: SupabaseClient[] = []
     try {
       const authUsers = users.map(({ data, error }) => {
         if (error || !data.user)
@@ -60,59 +57,120 @@ integrationTest(
         usernameFragment: "test",
       }
 
+      const ownerDevice = crypto.randomUUID()
+      const siblingDevice = crypto.randomUUID()
+      const redeemerDevice = crypto.randomUUID()
+      const thirdDevice = crypto.randomUUID()
+      const { error: deviceError } = await admin.from("devices").insert([
+        { id: ownerDevice, person_id: ownerId, name: "Owner" },
+        { id: siblingDevice, person_id: ownerId, name: "Sibling" },
+        { id: redeemerDevice, person_id: redeemerId, name: "Redeemer" },
+        { id: thirdDevice, person_id: thirdId, name: "Third" },
+      ])
+      if (deviceError) throw deviceError
+
       await expect(
-        unauthenticated.signals.send({ toPersonId: ownerId, payload: offer }),
+        unauthenticated.signals.send({
+          deviceId: redeemerDevice,
+          toDeviceId: ownerDevice,
+          payload: offer,
+        }),
       ).rejects.toMatchObject({ code: "UNAUTHORIZED" })
       await expect(
-        owner.signals.send({ toPersonId: "invalid", payload: offer }),
+        owner.signals.send({
+          deviceId: ownerDevice,
+          toDeviceId: "invalid",
+          payload: offer,
+        }),
       ).rejects.toMatchObject({ code: "BAD_REQUEST" })
       await expect(
         owner.signals.send({
-          toPersonId: ownerId,
+          deviceId: redeemerDevice,
+          toDeviceId: ownerDevice,
           payload: { type: "offer" } as never,
         }),
       ).rejects.toMatchObject({ code: "BAD_REQUEST" })
       await expect(
         owner.signals.send({
-          toPersonId: ownerId,
+          deviceId: redeemerDevice,
+          toDeviceId: ownerDevice,
           payload: { candidate: 5 } as never,
         }),
       ).rejects.toMatchObject({ code: "BAD_REQUEST" })
       await expect(
-        owner.signals.send({ toPersonId: thirdId, payload: offer }),
+        owner.signals.send({
+          deviceId: ownerDevice,
+          toDeviceId: thirdDevice,
+          payload: offer,
+        }),
       ).rejects.toMatchObject({ code: "FORBIDDEN" })
 
-      const deviceId = crypto.randomUUID()
-      const { error: deviceError } = await admin
-        .from("devices")
-        .insert({ id: deviceId, person_id: ownerId, name: "Owner" })
-      if (deviceError) throw deviceError
-      subscriber = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-      )
-      const { data: session, error: signInError } =
-        await subscriber.auth.signInWithPassword(credentials[0]!)
-      if (signInError || !session.session)
-        throw signInError ?? new Error("Sign-in failed")
-      await subscriber.realtime.setAuth(session.session.access_token)
-      const received: unknown[] = []
-      channel = subscriber
-        .channel(`device:${deviceId}`, { config: { private: true } })
-        .on("broadcast", { event: "signal" }, ({ payload }) =>
-          received.push(payload),
+      for (const deviceId of [crypto.randomUUID(), redeemerDevice]) {
+        await expect(
+          owner.signals.send({
+            deviceId,
+            toDeviceId: siblingDevice,
+            payload: offer,
+          }),
+        ).rejects.toMatchObject({ code: "FORBIDDEN" })
+      }
+      await expect(
+        owner.signals.send({
+          deviceId: ownerDevice,
+          toDeviceId: crypto.randomUUID(),
+          payload: offer,
+        }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" })
+      await expect(
+        owner.signals.send({
+          deviceId: ownerDevice,
+          toDeviceId: ownerDevice,
+          payload: offer,
+        }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" })
+      await expect(
+        owner.signals.send({
+          deviceId: "invalid",
+          toDeviceId: ownerDevice,
+          payload: offer,
+        }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" })
+
+      const subscribe = async (deviceId: string, credentialIndex: number) => {
+        const subscriber = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
         )
-      await new Promise<void>((resolve, reject) => {
-        channel!.subscribe((status, error) => {
-          if (status === "SUBSCRIBED") resolve()
-          else if (
-            error ||
-            status === "CHANNEL_ERROR" ||
-            status === "TIMED_OUT"
+        subscribers.push(subscriber)
+        const { data: session, error } =
+          await subscriber.auth.signInWithPassword(
+            credentials[credentialIndex]!,
           )
-            reject(error ?? new Error(status))
+        if (error || !session.session)
+          throw error ?? new Error("Sign-in failed")
+        await subscriber.realtime.setAuth(session.session.access_token)
+        const messages: unknown[] = []
+        const channel = subscriber
+          .channel(`device:${deviceId}`, { config: { private: true } })
+          .on("broadcast", { event: "signal" }, ({ payload }) =>
+            messages.push(payload),
+          )
+        await new Promise<void>((resolve, reject) => {
+          channel.subscribe((status, error) => {
+            if (status === "SUBSCRIBED") resolve()
+            else if (
+              error ||
+              status === "CHANNEL_ERROR" ||
+              status === "TIMED_OUT"
+            )
+              reject(error ?? new Error(status))
+          })
         })
-      })
+        return messages
+      }
+      const received = await subscribe(ownerDevice, 0)
+      const siblingReceived = await subscribe(siblingDevice, 0)
+      const redeemerReceived = await subscribe(redeemerDevice, 1)
       const waitFor = async (count: number) => {
         const deadline = Date.now() + 3000
         while (received.length < count && Date.now() < deadline)
@@ -121,27 +179,46 @@ integrationTest(
       }
 
       await owner.signals.send({
-        toPersonId: ownerId,
+        deviceId: siblingDevice,
+        toDeviceId: ownerDevice,
         payload: offer,
         fromPersonId: thirdId,
+        fromDeviceId: thirdDevice,
       } as never)
       await waitFor(1)
-      expect(received[0]).toEqual({ fromPersonId: ownerId, payload: offer })
+      expect(received[0]).toEqual({
+        fromPersonId: ownerId,
+        fromDeviceId: siblingDevice,
+        payload: offer,
+      })
 
       const code = (await owner.pairing.create()).code
       await redeemer.pairing.redeem({ code })
       await expect(third.pairing.redeem({ code })).rejects.toMatchObject({
         code: "FORBIDDEN",
       })
-      await redeemer.signals.send({ toPersonId: ownerId, payload: candidate })
+      await redeemer.signals.send({
+        deviceId: redeemerDevice,
+        toDeviceId: ownerDevice,
+        payload: candidate,
+      })
       await waitFor(2)
       expect(received[1]).toEqual({
         fromPersonId: redeemerId,
+        fromDeviceId: redeemerDevice,
         payload: candidate,
       })
-      await owner.signals.send({ toPersonId: redeemerId, payload: answer })
+      await owner.signals.send({
+        deviceId: ownerDevice,
+        toDeviceId: redeemerDevice,
+        payload: answer,
+      })
       await expect(
-        third.signals.send({ toPersonId: ownerId, payload: offer }),
+        third.signals.send({
+          deviceId: thirdDevice,
+          toDeviceId: ownerDevice,
+          payload: offer,
+        }),
       ).rejects.toMatchObject({ code: "FORBIDDEN" })
 
       const { error: expireError } = await admin
@@ -150,10 +227,18 @@ integrationTest(
         .eq("code", code)
       if (expireError) throw expireError
       await expect(
-        redeemer.signals.send({ toPersonId: ownerId, payload: offer }),
+        redeemer.signals.send({
+          deviceId: redeemerDevice,
+          toDeviceId: ownerDevice,
+          payload: offer,
+        }),
       ).rejects.toMatchObject({ code: "FORBIDDEN" })
       await expect(
-        owner.signals.send({ toPersonId: redeemerId, payload: offer }),
+        owner.signals.send({
+          deviceId: ownerDevice,
+          toDeviceId: redeemerDevice,
+          payload: offer,
+        }),
       ).rejects.toMatchObject({ code: "FORBIDDEN" })
 
       const wrongCode = `W${crypto.randomUUID().slice(0, 12)}`.toUpperCase()
@@ -166,7 +251,11 @@ integrationTest(
         .insert({ code: wrongCode, from_person_id: redeemerId })
       if (wrongRedemptionError) throw wrongRedemptionError
       await expect(
-        redeemer.signals.send({ toPersonId: ownerId, payload: offer }),
+        redeemer.signals.send({
+          deviceId: redeemerDevice,
+          toDeviceId: ownerDevice,
+          payload: offer,
+        }),
       ).rejects.toMatchObject({ code: "FORBIDDEN" })
 
       const [person_1_id, person_2_id] = canonicalConnectionIds(
@@ -177,11 +266,26 @@ integrationTest(
         .from("connections")
         .insert({ person_1_id, person_2_id })
       if (connectionError) throw connectionError
-      await redeemer.signals.send({ toPersonId: ownerId, payload: answer })
+      await redeemer.signals.send({
+        deviceId: redeemerDevice,
+        toDeviceId: ownerDevice,
+        payload: answer,
+      })
       await waitFor(3)
-      expect(received[2]).toEqual({ fromPersonId: redeemerId, payload: answer })
+      expect(received[2]).toEqual({
+        fromPersonId: redeemerId,
+        fromDeviceId: redeemerDevice,
+        payload: answer,
+      })
+      await new Promise((resolve) => setTimeout(resolve, 250))
+      expect(siblingReceived).toEqual([])
+      expect(redeemerReceived).toEqual([
+        { fromPersonId: ownerId, fromDeviceId: ownerDevice, payload: answer },
+      ])
     } finally {
-      if (channel && subscriber) await subscriber.removeChannel(channel)
+      await Promise.all(
+        subscribers.map((subscriber) => subscriber.removeAllChannels()),
+      )
       await Promise.all(
         users.flatMap(({ data }) =>
           data.user ? [admin.auth.admin.deleteUser(data.user.id)] : [],
