@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server"
 import { addMinutes, subMinutes } from "date-fns"
+import { isDeepStrictEqual } from "node:util"
 import { z } from "zod"
 
 import { canCreateConnection } from "@/modules/connections/create/connection-authorization"
@@ -99,6 +100,7 @@ export const appRouter = router({
     request: protectedProcedure
       .input(
         z.object({
+          requestId: z.uuid(),
           deviceId: z.uuid(),
           toPersonId: z.uuid(),
           payload: requestPayloadSchema,
@@ -136,19 +138,41 @@ export const appRouter = router({
           if (!connection) throw new TRPCError({ code: "FORBIDDEN" })
         }
 
-        const { data, error } = await admin
-          .from("share_requests")
-          .insert({
+        const { error } = await admin.from("share_requests").upsert(
+          {
+            id: input.requestId,
             from_person_id: person.id,
             from_device_id: device.id,
             to_person_id: input.toPersonId,
             payload: input.payload,
             expires_at: addMinutes(new Date(), 10).toISOString(),
-          })
-          .select()
-          .single()
+          },
+          { onConflict: "id", ignoreDuplicates: true },
+        )
         if (error) throw error
-        return data
+
+        const { data: request, error: requestError } = await admin
+          .from("share_requests")
+          .select()
+          .eq("id", input.requestId)
+          .single()
+        if (requestError) throw requestError
+        if (
+          request.from_person_id !== person.id ||
+          request.from_device_id !== device.id
+        )
+          throw new TRPCError({ code: "FORBIDDEN" })
+        if (
+          request.to_person_id !== input.toPersonId ||
+          !isDeepStrictEqual(request.payload, input.payload)
+        )
+          throw new TRPCError({ code: "CONFLICT" })
+        if (new Date(request.expires_at).getTime() <= Date.now())
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Share request expired",
+          })
+        return request
       }),
     respond: protectedProcedure
       .input(

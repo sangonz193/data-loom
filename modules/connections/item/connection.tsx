@@ -128,12 +128,27 @@ function ConnectionContent({
 
           {(state.value === "connecting" ||
             state.value === "sending request" ||
-            state.value === "connecting with caller") && (
+            (state.matches("receiving connection") &&
+              !state.matches({
+                "receiving connection": "acceptance failed",
+              })) ||
+            state.value === "declining request") && (
             <span className="animate-pulse text-muted-foreground">
               {(() => {
+                if (state.matches("receiving connection")) {
+                  return (
+                      state.matches({
+                        "receiving connection": "connecting with caller",
+                      })
+                    ) ?
+                      "Connecting..."
+                    : "Accepting request..."
+                }
                 switch (state.value) {
                   case "sending request":
                     return "Sending request..."
+                  case "declining request":
+                    return "Declining request..."
                 }
                 return "Connecting..."
               })()}
@@ -158,6 +173,29 @@ function ConnectionContent({
       </div>
 
       <FilesList actor={actor} />
+
+      {(state.value === "request failed" ||
+        state.matches({ "receiving connection": "acceptance failed" }) ||
+        state.value === "decline failed") && (
+        <div role="alert" className="flex-row items-center gap-2 text-sm">
+          <span>
+            {state.value === "request failed" ?
+              "Could not complete the file request."
+            : state.matches({ "receiving connection": "acceptance failed" }) ?
+              "Could not accept the file request."
+            : "Could not decline the file request."}
+          </span>
+          <Button variant="outline" onClick={() => send({ type: "retry" })}>
+            Retry
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => send({ type: "dismiss-error" })}
+          >
+            Dismiss
+          </Button>
+        </div>
+      )}
 
       <div className="flex-row-reverse gap-3">
         <DeleteConnection remotePersonId={remoteUserId} />

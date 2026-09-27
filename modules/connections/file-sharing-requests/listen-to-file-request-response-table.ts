@@ -9,10 +9,12 @@ type Input = {
   requestId: string
 }
 
-export type ListenToFileRequestResponseTableOutputEvent = {
-  type: "file-request-response"
-  response: Tables<"share_request_responses">
-}
+export type ListenToFileRequestResponseTableOutputEvent =
+  | {
+      type: "file-request-response"
+      response: Tables<"share_request_responses">
+    }
+  | { type: "file-request-response.failed" }
 
 export const listenToFileRequestResponseTable = fromCallback<
   AnyEventObject,
@@ -23,8 +25,40 @@ export const listenToFileRequestResponseTable = fromCallback<
   ) => void
   const { supabase, requestId } = params.input
 
+  let finished = false
+  const controller = new AbortController()
+  const deliver = (event: ListenToFileRequestResponseTableOutputEvent) => {
+    if (finished) return
+    finished = true
+    sendBack(event)
+  }
+  const fail = (error: unknown) => {
+    if (finished) return
+    logger.error(
+      "[listenToFileRequestResponseTable] Response listener failed",
+      error,
+    )
+    deliver({ type: "file-request-response.failed" })
+  }
+  const readResponse = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("share_request_responses")
+        .select()
+        .eq("request_id", requestId)
+        .abortSignal(controller.signal)
+        .maybeSingle()
+      if (error) throw error
+      if (data) deliver({ type: "file-request-response", response: data })
+    } catch (error) {
+      fail(error)
+    }
+  }
+
   const channel = supabase
-    .channel("file_requests_response")
+    .channel(`file_requests_response:${requestId}`, {
+      config: { postgres_changes_options: { wait: true } },
+    })
     .on(
       "postgres_changes",
       {
@@ -35,29 +69,24 @@ export const listenToFileRequestResponseTable = fromCallback<
         filter: `${"request_id" satisfies keyof Tables<"share_request_responses">}=eq.${requestId}`,
       },
       (payload) => {
-        const newRow = payload.new as Tables<"share_request_responses">
-        logger.info(
-          "[listenToFileRequestResponseTable] Received new file request response",
-          newRow,
-        )
-        sendBack({ type: "file-request-response", response: newRow })
+        deliver({
+          type: "file-request-response",
+          response: payload.new as Tables<"share_request_responses">,
+        })
       },
     )
     .subscribe((status, error) => {
-      if (error) {
-        logger.error(
-          "[listenToFileRequestResponseTable] Error subscribing to channel",
-          error,
-        )
+      if (finished) return
+      if (error || status !== "SUBSCRIBED") {
+        fail(error ?? new Error(status))
       } else {
-        logger.info(
-          "[listenToFileRequestResponseTable] Subscribed to channel",
-          status,
-        )
+        void readResponse()
       }
     })
 
   return () => {
-    supabase.removeChannel(channel)
+    finished = true
+    controller.abort()
+    void supabase.removeChannel(channel)
   }
 })

@@ -15,12 +15,14 @@ type Props = {
   file: z.infer<typeof fileMetadataSchema> | File
   sendActorRef: ActorRefFrom<typeof sendFileActor> | undefined
   receiveActorRef: ActorRefFrom<typeof receiveFileActor> | undefined
+  requestFailed: boolean
 }
 
 export function FileTransferState({
   file,
   sendActorRef,
   receiveActorRef,
+  requestFailed,
 }: Props) {
   const { fileName, fileSize } = getFileNameAndSize(file)
 
@@ -65,7 +67,7 @@ export function FileTransferState({
     <div
       className={cn(
         "relative gap-1 overflow-hidden rounded-md border",
-        !sendActorRef && !receiveActorRef && "animate-pulse",
+        !sendActorRef && !receiveActorRef && !requestFailed && "animate-pulse",
       )}
     >
       <div className="relative flex-row items-center gap-2 py-1 pl-3 pr-1">
