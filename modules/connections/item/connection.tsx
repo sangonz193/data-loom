@@ -28,7 +28,7 @@ type Props = {
 
 export function Connection({ connection }: Props) {
   const person = usePerson()
-  const device = useDevice()
+  const { device } = useDevice()
 
   if (!person.data || !device) return null
 

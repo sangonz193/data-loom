@@ -46,7 +46,16 @@ export function CreateConnectionDialog({ className, size = "sm" }: Props) {
 }
 
 function Content() {
-  const device = useDevice()
+  const { device, error, retry } = useDevice()
+
+  if (error)
+    return (
+      <>
+        <DialogTitle>Couldn’t register this device</DialogTitle>
+        <p>Please try again.</p>
+        <Button onClick={retry}>Retry</Button>
+      </>
+    )
 
   if (!device) return <Spinner />
 

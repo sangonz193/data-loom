@@ -105,6 +105,7 @@ integrationTest(
 
       await expect(second.devices.register({ id })).rejects.toMatchObject({
         code: "FORBIDDEN",
+        message: "DEVICE_OWNED_BY_ANOTHER_PERSON",
       })
       const { data: retained, error: retainedError } = await admin
         .from("devices")
