@@ -9,6 +9,9 @@ on:
       - modules/connections/delete-connection.tsx
       - modules/connections/create/connection-ids.ts
       - modules/connections/create/actions.ts
+      - modules/connections/item/machine.ts
+      - modules/connections/item/connection.tsx
+      - modules/connections/file-sharing-requests/payload.ts
       - modules/connections/create/constants.ts
       - modules/connections/create/new-connection.ts
       - modules/connections/use-device.ts

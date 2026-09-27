@@ -1,4 +1,5 @@
 import type { User } from "@supabase/supabase-js"
+import type { TRPCClient } from "@trpc/client"
 import {
   type ActorRefFrom,
   assign,
@@ -11,6 +12,7 @@ import {
 import { z } from "zod"
 
 import { logger } from "@/logger"
+import type { AppRouter } from "@/modules/api/router"
 import type { Tables } from "@/supabase/types"
 import { createClient } from "@/utils/supabase/client"
 
@@ -18,7 +20,6 @@ import { receiveFileActor } from "../../data-transfer/receive-file"
 import { sendFileActor } from "../../data-transfer/send-file"
 import { connectCallerPeerMachine } from "../connect-caller-peer"
 import { connectReceiverPeerMachine } from "../connect-receiver-peer"
-import { createShareRequest, respondToShareRequest } from "../create/actions"
 import type { ListenToFileRequestResponseTableOutputEvent } from "../file-sharing-requests/listen-to-file-request-response-table"
 import { listenToFileRequestResponseTable } from "../file-sharing-requests/listen-to-file-request-response-table"
 import { requestPayloadSchema } from "../file-sharing-requests/payload"
@@ -30,6 +31,7 @@ type Input = {
   remoteUserId: string
   deviceId: string
   supabase: ReturnType<typeof createClient>
+  trpcClient: TRPCClient<AppRouter>
 }
 
 interface Context extends Input {
@@ -178,10 +180,12 @@ export const connectionMachine = setup({
     receiveFile: receiveFileActor,
     listenToFileRequestResponseTable,
     sendRequest: fromPromise<Tables<"share_requests">, Context>(
-      async ({ input: { remoteUserId, deviceId, filesToSend } }) => {
+      async ({
+        input: { remoteUserId, deviceId, filesToSend, trpcClient },
+      }) => {
         if (!filesToSend) throw new Error("`filesToSend` is not defined")
 
-        return createShareRequest({
+        return trpcClient.shares.request.mutate({
           deviceId,
           toPersonId: remoteUserId,
           payload: {
@@ -485,7 +489,7 @@ async function sendResponse({
   context: Context
   accept: boolean
 }) {
-  return respondToShareRequest({
+  return context.trpcClient.shares.respond.mutate({
     requestId: context.request!.id,
     accepted: accept,
     deviceId: context.deviceId,

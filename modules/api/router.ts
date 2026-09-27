@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server"
-import { subMinutes } from "date-fns"
+import { addMinutes, subMinutes } from "date-fns"
 import { z } from "zod"
 
 import { canCreateConnection } from "@/modules/connections/create/connection-authorization"
@@ -7,6 +7,7 @@ import {
   CODE_EXPIRATION_MINUTES,
   CODE_LENGTH,
 } from "@/modules/connections/create/constants"
+import { requestPayloadSchema } from "@/modules/connections/file-sharing-requests/payload"
 import { createAdminClient } from "@/utils/supabase/admin"
 
 import { getConnectionRedemptions } from "./connection-redemptions"
@@ -15,6 +16,109 @@ import { protectedProcedure, router } from "./trpc"
 import { canonicalConnectionIds } from "../connections/create/connection-ids"
 
 export const appRouter = router({
+  shares: router({
+    request: protectedProcedure
+      .input(
+        z.object({
+          deviceId: z.uuid(),
+          toPersonId: z.uuid(),
+          payload: requestPayloadSchema,
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const admin = createAdminClient()
+        const { data: person, error: personError } = await admin
+          .from("people")
+          .select("id")
+          .eq("auth_user_id", ctx.userId)
+          .maybeSingle()
+        if (personError) throw personError
+        if (!person) throw new TRPCError({ code: "FORBIDDEN" })
+
+        const { data: device, error: deviceError } = await admin
+          .from("devices")
+          .select("id")
+          .match({ id: input.deviceId, person_id: person.id })
+          .maybeSingle()
+        if (deviceError) throw deviceError
+        if (!device) throw new TRPCError({ code: "FORBIDDEN" })
+
+        if (person.id !== input.toPersonId) {
+          const [person_1_id, person_2_id] = canonicalConnectionIds(
+            person.id,
+            input.toPersonId,
+          )
+          const { data: connection, error: connectionError } = await admin
+            .from("connections")
+            .select("person_1_id")
+            .match({ person_1_id, person_2_id })
+            .maybeSingle()
+          if (connectionError) throw connectionError
+          if (!connection) throw new TRPCError({ code: "FORBIDDEN" })
+        }
+
+        const { data, error } = await admin
+          .from("share_requests")
+          .insert({
+            from_person_id: person.id,
+            from_device_id: device.id,
+            to_person_id: input.toPersonId,
+            payload: input.payload,
+            expires_at: addMinutes(new Date(), 10).toISOString(),
+          })
+          .select()
+          .single()
+        if (error) throw error
+        return data
+      }),
+    respond: protectedProcedure
+      .input(
+        z.object({
+          requestId: z.uuid(),
+          accepted: z.boolean(),
+          deviceId: z.uuid(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const admin = createAdminClient()
+        const { data: person, error: personError } = await admin
+          .from("people")
+          .select("id")
+          .eq("auth_user_id", ctx.userId)
+          .maybeSingle()
+        if (personError) throw personError
+        if (!person) throw new TRPCError({ code: "FORBIDDEN" })
+
+        const { data: request, error: requestError } = await admin
+          .from("share_requests")
+          .select("id")
+          .match({ id: input.requestId, to_person_id: person.id })
+          .gt("expires_at", new Date().toISOString())
+          .maybeSingle()
+        if (requestError) throw requestError
+        if (!request) throw new TRPCError({ code: "NOT_FOUND" })
+
+        const { data: device, error: deviceError } = await admin
+          .from("devices")
+          .select("id")
+          .match({ id: input.deviceId, person_id: person.id })
+          .maybeSingle()
+        if (deviceError) throw deviceError
+        if (!device) throw new TRPCError({ code: "FORBIDDEN" })
+
+        const { data, error } = await admin
+          .from("share_request_responses")
+          .upsert({
+            request_id: request.id,
+            accepted: input.accepted,
+            accepted_by_device_id: input.accepted ? device.id : null,
+          })
+          .select()
+          .single()
+        if (error) throw error
+        return data
+      }),
+  }),
   devices: router({
     register: protectedProcedure
       .input(z.object({ id: z.uuid() }))
