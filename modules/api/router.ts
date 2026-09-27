@@ -299,6 +299,27 @@ export const appRouter = router({
       }),
   }),
   devices: router({
+    remove: protectedProcedure
+      .input(z.object({ id: z.uuid() }))
+      .mutation(async ({ ctx, input }) => {
+        const admin = createAdminClient()
+        const { data: person, error: personError } = await admin
+          .from("people")
+          .select("id")
+          .eq("auth_user_id", ctx.userId)
+          .maybeSingle()
+        if (personError) throw personError
+        if (!person) throw new TRPCError({ code: "FORBIDDEN" })
+
+        const { data: device, error } = await admin
+          .from("devices")
+          .delete()
+          .match({ id: input.id, person_id: person.id })
+          .select("id")
+          .maybeSingle()
+        if (error) throw error
+        if (!device) throw new TRPCError({ code: "NOT_FOUND" })
+      }),
     register: protectedProcedure
       .input(z.object({ id: z.uuid() }))
       .mutation(async ({ ctx, input }) => {
