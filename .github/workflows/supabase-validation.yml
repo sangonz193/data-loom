@@ -9,6 +9,10 @@ on:
       - modules/connections/delete-connection.tsx
       - modules/connections/create/connection-ids.ts
       - modules/connections/create/actions.ts
+      - modules/connections/create/signal-authorization.ts
+      - modules/connections/connect-caller-peer.ts
+      - modules/connections/connect-receiver-peer.ts
+      - modules/connections/web-rtc-signals.ts
       - modules/connections/item/machine.ts
       - modules/connections/item/connection.tsx
       - modules/connections/file-sharing-requests/payload.ts

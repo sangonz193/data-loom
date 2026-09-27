@@ -1,7 +1,9 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js"
+import type { TRPCClient } from "@trpc/client"
 import { assign, sendParent, sendTo, setup } from "xstate"
 
 import { logger } from "@/logger"
+import type { AppRouter } from "@/modules/api/router"
 import type { Database } from "@/supabase/types"
 
 import { cleanUpSignalingRowsActor } from "./clean-up-signaling-rows"
@@ -10,7 +12,6 @@ import type {
   ConnectPeerOutputEvent,
 } from "./connect-peer"
 import { connectPeer } from "./connect-peer"
-import { sendSignal } from "./create/actions"
 import type { WebRtcSignalsOutputEvent } from "./web-rtc-signals"
 import { webRtcSignals } from "./web-rtc-signals"
 
@@ -20,6 +21,7 @@ type Input = {
   currentUser: User
   remoteUserId: string
   deviceId: string
+  trpcClient: TRPCClient<AppRouter>
   offer?: RTCSessionDescriptionInit
 }
 
@@ -48,25 +50,47 @@ export const connectReceiverPeerMachine = setup({
     setAnswerToContext: assign({
       answer: (_, answer: RTCSessionDescriptionInit) => answer,
     }),
-    sendAnswer: async (
-      { context: { remoteUserId } },
+    sendAnswer: (
+      { context: { remoteUserId, trpcClient }, self },
       answer: RTCSessionDescriptionInit,
     ) => {
       logger.info("[connectReceiverPeerMachine] sending answer", answer)
-      await sendSignal({ toPersonId: remoteUserId, payload: answer })
+      trpcClient.signals.send
+        .mutate({
+          toPersonId: remoteUserId,
+          payload: answer as { type: "answer"; sdp: string },
+        })
+        .catch((error) => {
+          logger.error("[connectReceiverPeerMachine] sendAnswer error", error)
+          self.send({
+            type: "peer-connection.failed",
+            error: { type: "unknown" },
+          })
+        })
     },
-    sendIceCandidate: async (
-      { context: { remoteUserId } },
+    sendIceCandidate: (
+      { context: { remoteUserId, trpcClient }, self },
       candidate: RTCIceCandidate,
     ) => {
       logger.info(
         "[connectReceiverPeerMachine] sending ice candidate",
         candidate,
       )
-      await sendSignal({
-        toPersonId: remoteUserId,
-        payload: candidate.toJSON(),
-      })
+      trpcClient.signals.send
+        .mutate({
+          toPersonId: remoteUserId,
+          payload: { ...candidate.toJSON(), candidate: candidate.candidate },
+        })
+        .catch((error) => {
+          logger.error(
+            "[connectReceiverPeerMachine] sendIceCandidate error",
+            error,
+          )
+          self.send({
+            type: "peer-connection.failed",
+            error: { type: "unknown" },
+          })
+        })
     },
   },
   actors: {
