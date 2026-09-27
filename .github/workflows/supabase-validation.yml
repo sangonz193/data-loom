@@ -7,6 +7,7 @@ on:
       - modules/api/**
       - modules/auth/**
       - app/account/**
+      - app/link-device/**
       - app/auth/**
       - app/auto-login/**
       - components/header.tsx
