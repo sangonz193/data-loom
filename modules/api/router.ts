@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server"
 import { subMinutes } from "date-fns"
 import { z } from "zod"
 
+import { canCreateConnection } from "@/modules/connections/create/connection-authorization"
 import {
   CODE_EXPIRATION_MINUTES,
   CODE_LENGTH,
@@ -90,8 +91,95 @@ export const appRouter = router({
 
         return { remotePersonId: pairingCode.person_id }
       }),
+    notifyRedeemed: protectedProcedure
+      .input(z.object({ code: z.string().trim().min(1).max(32).toUpperCase() }))
+      .mutation(async ({ ctx, input }) => {
+        const admin = createAdminClient()
+        const { data: person, error: personError } = await admin
+          .from("people")
+          .select("id")
+          .eq("auth_user_id", ctx.userId)
+          .maybeSingle()
+        if (personError) throw personError
+        if (!person) throw new TRPCError({ code: "FORBIDDEN" })
+
+        const { data: redemption, error } = await admin
+          .from("pairing_code_redemptions")
+          .select("code, pairing_codes!inner(person_id, purpose, created_at)")
+          .match({ code: input.code, from_person_id: person.id })
+          .eq("pairing_codes.purpose", "connection")
+          .gte(
+            "pairing_codes.created_at",
+            subMinutes(new Date(), CODE_EXPIRATION_MINUTES).toISOString(),
+          )
+          .maybeSingle()
+        if (error) throw error
+        if (!redemption) throw new TRPCError({ code: "NOT_FOUND" })
+
+        const { data: devices, error: devicesError } = await admin
+          .from("devices")
+          .select("id")
+          .eq("person_id", redemption.pairing_codes.person_id)
+        if (devicesError) throw devicesError
+        await Promise.all(
+          devices.map((device) =>
+            admin
+              .channel(`device:${device.id}`, { config: { private: true } })
+              .send({
+                type: "broadcast",
+                event: "pairing-redemption",
+                payload: { remotePersonId: person.id, code: redemption.code },
+              }),
+          ),
+        )
+      }),
   }),
   connections: router({
+    create: protectedProcedure
+      .input(z.object({ remotePersonId: z.uuid() }))
+      .mutation(async ({ ctx, input }) => {
+        const admin = createAdminClient()
+        const { data: person, error: personError } = await admin
+          .from("people")
+          .select("id")
+          .eq("auth_user_id", ctx.userId)
+          .maybeSingle()
+        if (personError) throw personError
+        if (!person) throw new TRPCError({ code: "FORBIDDEN" })
+
+        const { data: redemptions, error } = await admin
+          .from("pairing_code_redemptions")
+          .select(
+            "from_person_id, pairing_codes!inner(person_id, purpose, created_at)",
+          )
+          .eq("pairing_codes.purpose", "connection")
+          .gte(
+            "pairing_codes.created_at",
+            subMinutes(new Date(), CODE_EXPIRATION_MINUTES).toISOString(),
+          )
+        if (error) throw error
+        if (
+          !canCreateConnection({
+            personId: person.id,
+            remotePersonId: input.remotePersonId,
+            pairingRedemptions: redemptions.map((redemption) => ({
+              fromPersonId: redemption.from_person_id,
+              codePersonId: redemption.pairing_codes.person_id,
+              codeCreatedAt: redemption.pairing_codes.created_at,
+            })),
+          })
+        )
+          throw new TRPCError({ code: "NOT_FOUND" })
+
+        const [person_1_id, person_2_id] = canonicalConnectionIds(
+          person.id,
+          input.remotePersonId,
+        )
+        const { error: insertError } = await admin
+          .from("connections")
+          .upsert({ person_1_id, person_2_id })
+        if (insertError) throw insertError
+      }),
     delete: protectedProcedure
       .input(z.object({ remotePersonId: z.uuid() }))
       .mutation(async ({ ctx, input }) => {
