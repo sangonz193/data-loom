@@ -1,11 +1,22 @@
 import { XCircleIcon } from "lucide-react"
 
-export function ConnectionErrored({ isPeerError }: { isPeerError: boolean }) {
+export function ConnectionErrored({
+  isPeerError,
+  isRateLimited,
+}: {
+  isPeerError: boolean
+  isRateLimited: boolean
+}) {
   return (
     <div className="gap-3">
       <XCircleIcon className="mx-auto size-14 text-destructive" />
 
-      {isPeerError ?
+      {isRateLimited ?
+        <span role="alert" className="text-balance text-foreground">
+          Too many unsuccessful code attempts. Wait a while, then reopen this
+          dialog to try again.
+        </span>
+      : isPeerError ?
         <div className="gap-2 text-balance text-foreground">
           <span>
             Couldn’t establish a direct link between the devices. For a better

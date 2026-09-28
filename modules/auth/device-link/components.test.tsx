@@ -11,6 +11,7 @@ import superjson from "superjson"
 import AccountPage from "@/app/account/page"
 import { TRPCProvider } from "@/modules/api/client"
 import type { AppRouter } from "@/modules/api/router"
+import { ConnectionErrored } from "@/modules/connections/create/dialog/connection-errored"
 import * as deviceHook from "@/modules/connections/use-device"
 import * as browserClient from "@/utils/supabase/client"
 
@@ -105,11 +106,14 @@ async function mounted({
               {
                 error: superjson.serialize({
                   message: rpcError,
-                  code: -32004,
-                  data: { code: rpcError, httpStatus: 404 },
+                  code: rpcError === "TOO_MANY_REQUESTS" ? -32029 : -32004,
+                  data: {
+                    code: rpcError,
+                    httpStatus: rpcError === "TOO_MANY_REQUESTS" ? 429 : 404,
+                  },
                 }),
               },
-              { status: 404 },
+              { status: rpcError === "TOO_MANY_REQUESTS" ? 429 : 404 },
             )
           const value =
             path === "pairing.create" ?
@@ -500,6 +504,7 @@ for (const change of ["edit", "choose"] as const) {
 for (const [code, message] of [
   ["NOT_FOUND", "Code not found or expired"],
   ["FORBIDDEN", "already used on another device"],
+  ["TOO_MANY_REQUESTS", "Wait a while before trying again"],
 ]) {
   test(`anonymous link screen reports ${code} before requesting credentials`, async () => {
     const user = { id: "B", is_anonymous: true } as User
@@ -516,12 +521,33 @@ for (const [code, message] of [
       await m.submit()
       expect(m.container.textContent).toContain(message!)
       expect(m.container.querySelector('input[type="password"]')).toBeNull()
+      await m.render(
+        <RequiredAuthClient user={user}>
+          <LinkDevice />
+        </RequiredAuthClient>,
+      )
       expect(m.calls.filter((path) => path === "devices.link")).toHaveLength(1)
     } finally {
       await m.close()
     }
   })
 }
+
+test("connection dialog rate limit copy asks for a delayed explicit retry", async () => {
+  const m = await mounted({
+    user: { id: "B", is_anonymous: true } as User,
+    content: <ConnectionErrored isPeerError={false} isRateLimited />,
+  })
+  try {
+    expect(m.container.querySelector('[role="alert"]')?.textContent).toContain(
+      "Wait a while, then reopen this dialog",
+    )
+    expect(m.container.textContent).not.toContain("new code")
+    expect(m.calls).toEqual([])
+  } finally {
+    await m.close()
+  }
+})
 
 test("Account route mounts sign-in with null user and dead B credentials and can recover explicitly", async () => {
   const page = await AccountPage({ searchParams: Promise.resolve({}) })

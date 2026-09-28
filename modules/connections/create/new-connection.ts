@@ -1,5 +1,5 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js"
-import type { TRPCClient } from "@trpc/client"
+import { TRPCClientError, type TRPCClient } from "@trpc/client"
 import { assign, fromCallback, fromPromise, setup } from "xstate"
 import { z } from "zod"
 
@@ -21,6 +21,7 @@ type Input = {
 }
 
 interface Context extends Input {
+  redemptionErrorCode?: NonNullable<TRPCClientError<AppRouter>["data"]>["code"]
   createdCode?: Awaited<
     ReturnType<TRPCClient<AppRouter>["pairing"]["create"]["mutate"]>
   >
@@ -260,7 +261,15 @@ export const newConnectionMachine = setup({
       invoke: {
         src: "redeemCode",
         input: ({ context }) => context,
-        onError: "connection errored",
+        onError: {
+          target: "connection errored",
+          actions: assign({
+            redemptionErrorCode: ({ event }) =>
+              event.error instanceof TRPCClientError ?
+                (event.error as TRPCClientError<AppRouter>).data?.code
+              : undefined,
+          }),
+        },
         onDone: {
           target: "connecting receiver",
           actions: [
