@@ -5,6 +5,7 @@ import { createHmac } from "node:crypto"
 import superjson from "superjson"
 
 import { POST } from "@/app/api/trpc/[trpc]/route"
+import { fixtureClientIp } from "@/modules/api/fixture-client-ip"
 import { canonicalConnectionIds } from "@/modules/connections/create/connection-ids"
 import { createAdminClient } from "@/utils/supabase/admin"
 
@@ -61,12 +62,18 @@ integrationTest(
       ])
       if (insertError) throw insertError
 
-      const unauthorized = appRouter.createCaller({ userId: null })
+      const unauthorized = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: null,
+      })
       await expect(
         unauthorized.connections.delete({ remotePersonId: secondId }),
       ).rejects.toMatchObject({ code: "UNAUTHORIZED" })
 
-      const owned = appRouter.createCaller({ userId: authUsers[0]!.id })
+      const owned = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authUsers[0]!.id,
+      })
       await expect(
         owned.connections.delete({ remotePersonId: thirdId }),
       ).rejects.toMatchObject({ code: "NOT_FOUND" })
@@ -97,6 +104,13 @@ integrationTest(
         )
       const context = await contextForAuthorization(`Bearer ${accessToken}`)
       expect(context.userId).toBe(authUsers[0]!.id)
+      expect(context.clientIp).toBe("127.0.0.1")
+      expect((await contextForAuthorization("Basic invalid")).clientIp).toBe(
+        "127.0.0.1",
+      )
+      expect((await contextForAuthorization("Bearer invalid")).clientIp).toBe(
+        "127.0.0.1",
+      )
       expect((await contextForAuthorization("Basic invalid")).userId).toBeNull()
       expect(
         (await contextForAuthorization("Bearer invalid")).userId,

@@ -1,10 +1,14 @@
+import { createTRPCClient, httpLink } from "@trpc/client"
 import { expect, test } from "bun:test"
+import superjson from "superjson"
 import {
   createActor,
   fromCallback,
   fromPromise,
   type SnapshotFrom,
 } from "xstate"
+
+import type { AppRouter } from "@/modules/api/router"
 
 import { connectCallerPeerMachine } from "../connect-caller-peer"
 import { connectReceiverPeerMachine } from "../connect-receiver-peer"
@@ -18,6 +22,48 @@ const input = {
   deviceId: "device-a",
   trpcClient: {} as never,
 }
+
+test("redemption preserves 429 and never retries automatically", async () => {
+  let calls = 0
+  const trpcClient = createTRPCClient<AppRouter>({
+    links: [
+      httpLink({
+        url: "http://localhost/api/trpc",
+        transformer: superjson,
+        fetch: async () => {
+          calls++
+          return Response.json(
+            {
+              error: superjson.serialize({
+                message: "Too many attempts",
+                code: -32029,
+                data: { code: "TOO_MANY_REQUESTS", httpStatus: 429 },
+              }),
+            },
+            { status: 429 },
+          )
+        },
+      }),
+    ],
+  })
+  const actor = createActor(newConnectionMachine, {
+    input: { ...input, trpcClient },
+  }).start()
+  try {
+    actor.send({ type: "redeem-code", code: "PAIRCODE" })
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(actor.getSnapshot().value).toBe("connection errored")
+    expect(actor.getSnapshot().context.redemptionErrorCode).toBe(
+      "TOO_MANY_REQUESTS",
+    )
+    expect(actor.getSnapshot().context.peerConnection).toBeUndefined()
+    actor.send({ type: "redeem-code", code: "PAIRCODE" })
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(calls).toBe(1)
+  } finally {
+    actor.stop()
+  }
+})
 
 async function settle() {
   for (let index = 0; index < 10; index++) await Promise.resolve()

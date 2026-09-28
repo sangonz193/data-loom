@@ -3,6 +3,7 @@ import { addMinutes, subMinutes } from "date-fns"
 import { isDeepStrictEqual } from "node:util"
 import { z } from "zod"
 
+import { logger } from "@/logger"
 import { canCreateConnection } from "@/modules/connections/create/connection-authorization"
 import {
   CODE_ALPHABET,
@@ -30,6 +31,42 @@ const deviceName = z
   .max(DEVICE_NAME_MAX_LENGTH)
   .regex(/^\P{Cc}*$/u)
 const COMPLETE_LINK_ATTEMPTS = 3
+
+async function redeemPairingCode(
+  admin: ReturnType<typeof createAdminClient>,
+  personId: string,
+  clientIp: string | null,
+  code: string,
+  purpose: "connection" | "device",
+) {
+  if (!clientIp) {
+    logger.error("Pairing redemption requires a trusted client IP")
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" })
+  }
+  const { data, error } = await admin
+    .rpc("redeem_pairing_code", {
+      redeemer_id: personId,
+      client_ip: clientIp,
+      pairing_code: code,
+      pairing_purpose: purpose,
+      ttl_seconds: CODE_EXPIRATION_MINUTES * 60,
+    })
+    .single()
+  if (error) throw error
+  switch (data.outcome) {
+    case "success":
+      return data.owner_person_id
+    case "limited":
+      throw new TRPCError({ code: "TOO_MANY_REQUESTS" })
+    case "not_found":
+      throw new TRPCError({ code: "NOT_FOUND" })
+    case "forbidden":
+    case "person_missing":
+      throw new TRPCError({ code: "FORBIDDEN" })
+    default:
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" })
+  }
+}
 
 async function isAnonymousAuthUser(
   admin: ReturnType<typeof createAdminClient>,
@@ -334,39 +371,13 @@ export const appRouter = router({
         if ((await isAnonymousAuthUser(admin, ctx.userId)) !== true)
           throw new TRPCError({ code: "FORBIDDEN" })
 
-        const { data: linkCode, error } = await admin
-          .from("pairing_codes")
-          .select("code, person_id")
-          .eq("code", input.code)
-          .eq("purpose", "device")
-          .gte(
-            "created_at",
-            subMinutes(new Date(), CODE_EXPIRATION_MINUTES).toISOString(),
-          )
-          .maybeSingle()
-        if (error) throw error
-        if (!linkCode) throw new TRPCError({ code: "NOT_FOUND" })
-        if (linkCode.person_id === person.id)
-          throw new TRPCError({ code: "FORBIDDEN" })
-
-        const { error: redemptionError } = await admin
-          .from("pairing_code_redemptions")
-          .upsert(
-            { code: linkCode.code, from_person_id: person.id },
-            { onConflict: "code", ignoreDuplicates: true },
-          )
-        if (redemptionError && redemptionError.code !== "23503")
-          throw redemptionError
-
-        const { data: redemption, error: existingError } = await admin
-          .from("pairing_code_redemptions")
-          .select("from_person_id")
-          .eq("code", linkCode.code)
-          .maybeSingle()
-        if (existingError) throw existingError
-        if (!redemption) throw new TRPCError({ code: "NOT_FOUND" })
-        if (redemption.from_person_id !== person.id)
-          throw new TRPCError({ code: "FORBIDDEN" })
+        await redeemPairingCode(
+          admin,
+          person.id,
+          ctx.clientIp,
+          input.code,
+          "device",
+        )
       }),
     completeLink: protectedProcedure
       .input(z.object({ code: pairingCode, deviceId: z.uuid() }))
@@ -534,40 +545,14 @@ export const appRouter = router({
         if (personError) throw personError
         if (!person) throw new TRPCError({ code: "FORBIDDEN" })
 
-        const { data: connectionCode, error } = await admin
-          .from("pairing_codes")
-          .select("code, person_id")
-          .eq("code", input.code)
-          .eq("purpose", "connection")
-          .gte(
-            "created_at",
-            subMinutes(new Date(), CODE_EXPIRATION_MINUTES).toISOString(),
-          )
-          .maybeSingle()
-        if (error) throw error
-        if (!connectionCode) throw new TRPCError({ code: "NOT_FOUND" })
-        if (connectionCode.person_id === person.id)
-          throw new TRPCError({ code: "FORBIDDEN" })
-
-        const { error: redemptionError } = await admin
-          .from("pairing_code_redemptions")
-          .upsert(
-            { code: connectionCode.code, from_person_id: person.id },
-            { onConflict: "code", ignoreDuplicates: true },
-          )
-        if (redemptionError) throw redemptionError
-
-        const { data: redemption, error: existingError } = await admin
-          .from("pairing_code_redemptions")
-          .select("from_person_id")
-          .eq("code", connectionCode.code)
-          .maybeSingle()
-        if (existingError) throw existingError
-        if (!redemption) throw new TRPCError({ code: "NOT_FOUND" })
-        if (redemption.from_person_id !== person.id)
-          throw new TRPCError({ code: "FORBIDDEN" })
-
-        return { remotePersonId: connectionCode.person_id }
+        const remotePersonId = await redeemPairingCode(
+          admin,
+          person.id,
+          ctx.clientIp,
+          input.code,
+          "connection",
+        )
+        return { remotePersonId }
       }),
     notifyRedeemed: protectedProcedure
       .input(z.object({ code: pairingCode, deviceId: z.uuid() }))

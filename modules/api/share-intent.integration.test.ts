@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js"
 import { expect, test } from "bun:test"
 
+import { fixtureClientIp } from "@/modules/api/fixture-client-ip"
 import { canonicalConnectionIds } from "@/modules/connections/create/connection-ids"
 import type { Database } from "@/supabase/types"
 import { createAdminClient } from "@/utils/supabase/admin"
@@ -71,9 +72,18 @@ integrationTest(
         .insert({ person_1_id, person_2_id })
       if (connectionError) throw connectionError
 
-      const sender = appRouter.createCaller({ userId: authIds[0]! })
-      const otherInstance = appRouter.createCaller({ userId: authIds[0]! })
-      const stranger = appRouter.createCaller({ userId: authIds[2]! })
+      const sender = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authIds[0]!,
+      })
+      const otherInstance = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authIds[0]!,
+      })
+      const stranger = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authIds[2]!,
+      })
       const payload = {
         files: [{ name: "file.txt", size: 1, mimeType: "text/plain" }],
       }

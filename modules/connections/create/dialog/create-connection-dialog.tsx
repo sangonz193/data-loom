@@ -103,7 +103,12 @@ function MachineContent({ deviceId }: { deviceId: string }) {
         )}
 
       {state.value === "connection errored" && (
-        <ConnectionErrored isPeerError={!!state.context.connectionErrorEvent} />
+        <ConnectionErrored
+          isPeerError={!!state.context.connectionErrorEvent}
+          isRateLimited={
+            state.context.redemptionErrorCode === "TOO_MANY_REQUESTS"
+          }
+        />
       )}
     </>
   )

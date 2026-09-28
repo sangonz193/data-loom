@@ -103,7 +103,9 @@ function LinkForm({
       setRedeemed(true)
     } catch (error) {
       setError(
-        linkErrorCode(error) === "NOT_FOUND" ? "Code not found or expired."
+        linkErrorCode(error) === "TOO_MANY_REQUESTS" ?
+          "Too many unsuccessful code attempts. Wait a while before trying again."
+        : linkErrorCode(error) === "NOT_FOUND" ? "Code not found or expired."
         : linkErrorCode(error) === "FORBIDDEN" ?
           "This code is already used on another device, or this browser is no longer anonymous."
         : "Couldn't use this code. Please try again.",

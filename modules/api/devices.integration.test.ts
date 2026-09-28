@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js"
 import { expect, test } from "bun:test"
 
+import { fixtureClientIp } from "@/modules/api/fixture-client-ip"
 import type { Database } from "@/supabase/types"
 import { createAdminClient } from "@/utils/supabase/admin"
 
@@ -40,7 +41,10 @@ integrationTest(
       }
       const ownerId = personId(authIds[0]!)
       const foreignId = personId(authIds[1]!)
-      const owner = appRouter.createCaller({ userId: authIds[0]! })
+      const owner = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authIds[0]!,
+      })
       const legacyId = crypto.randomUUID()
       const foreignDeviceId = crypto.randomUUID()
       const names = ["Laptop", "this device", "This Device", "This device  "]
@@ -165,7 +169,7 @@ integrationTest(
         ],
       })
       const registration = appRouter
-        .createCaller({ userId: authId })
+        .createCaller({ clientIp: fixtureClientIp(), userId: authId })
         .devices.register({ id, name: "Chrome on macOS" })
       await hold.waitForBlocked()
       await hold.release()
@@ -222,9 +226,18 @@ integrationTest(
       const [firstPersonId, secondPersonId] = personIds
       if (!firstPersonId || !secondPersonId) throw new Error("Missing person")
 
-      const first = appRouter.createCaller({ userId: authUsers[0]!.id })
-      const second = appRouter.createCaller({ userId: authUsers[1]!.id })
-      const anonymous = appRouter.createCaller({ userId: null })
+      const first = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authUsers[0]!.id,
+      })
+      const second = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authUsers[1]!.id,
+      })
+      const anonymous = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: null,
+      })
       const id = crypto.randomUUID()
 
       await expect(
@@ -379,9 +392,16 @@ integrationTest(
       })
       if (!ownerId || !otherId) throw new Error("Missing person")
 
-      const owner = appRouter.createCaller({ userId: authUsers[0]!.id })
-      const anonymous = appRouter.createCaller({ userId: null })
+      const owner = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authUsers[0]!.id,
+      })
+      const anonymous = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: null,
+      })
       const withoutPerson = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
         userId: crypto.randomUUID(),
       })
       const [
@@ -591,9 +611,18 @@ integrationTest(
       const ownerId = users[0].data.user?.id
       const foreignId = users[1].data.user?.id
       if (!ownerId || !foreignId) throw new Error("User creation failed")
-      const owner = appRouter.createCaller({ userId: ownerId })
-      const foreign = appRouter.createCaller({ userId: foreignId })
-      const anonymous = appRouter.createCaller({ userId: null })
+      const owner = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: ownerId,
+      })
+      const foreign = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: foreignId,
+      })
+      const anonymous = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: null,
+      })
       const ownDevice = crypto.randomUUID()
       const foreignDevice = crypto.randomUUID()
       await owner.devices.register({ id: ownDevice, name: "Chrome" })

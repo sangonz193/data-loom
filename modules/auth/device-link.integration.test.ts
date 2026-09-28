@@ -5,6 +5,7 @@ import { NextRequest } from "next/server"
 import { POST } from "@/app/api/trpc/[trpc]/route"
 import { createContext } from "@/modules/api/context"
 import { queryDatabase } from "@/modules/api/device-link-locks"
+import { fixtureClientIp } from "@/modules/api/fixture-client-ip"
 import { appRouter } from "@/modules/api/router"
 import { registerDevice } from "@/modules/connections/register-device"
 import type { Database } from "@/supabase/types"
@@ -53,7 +54,10 @@ async function fixture() {
   if (anonymous.error) throw anonymous.error
   const b = anonymous.data.user!
   ids.push(b.id)
-  const caller = appRouter.createCaller({ userId: b.id })
+  const caller = appRouter.createCaller({
+    clientIp: fixtureClientIp(),
+    userId: b.id,
+  })
   const deviceId = crypto.randomUUID()
   const storage = new Map([["data-loom-device-id", deviceId]])
   const deviceStorage = {
@@ -68,7 +72,7 @@ async function fixture() {
     deviceStorage,
   )
   const { code } = await appRouter
-    .createCaller({ userId: a.id })
+    .createCaller({ clientIp: fixtureClientIp(), userId: a.id })
     .pairing.create({ purpose: "device" })
   await caller.devices.link({ code })
   const isolated = createIsolatedAuth({
@@ -214,7 +218,7 @@ integrationTest(
         f.a.id,
         (id) =>
           appRouter
-            .createCaller({ userId: f.a.id })
+            .createCaller({ clientIp: fixtureClientIp(), userId: f.a.id })
             .devices.register({ id, name: "Browser" }),
         f.deviceStorage,
       )
@@ -286,7 +290,7 @@ integrationTest(
         f.a.id,
         (id) =>
           appRouter
-            .createCaller({ userId: f.a.id })
+            .createCaller({ clientIp: fixtureClientIp(), userId: f.a.id })
             .devices.register({ id, name: "Browser" }),
         f.deviceStorage,
       )

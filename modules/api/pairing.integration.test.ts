@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js"
 import { expect, test } from "bun:test"
 import { subMinutes } from "date-fns"
 
+import { fixtureClientIp } from "@/modules/api/fixture-client-ip"
 import { canonicalConnectionIds } from "@/modules/connections/create/connection-ids"
 import { createAdminClient } from "@/utils/supabase/admin"
 
@@ -45,10 +46,22 @@ integrationTest(
       const [ownerId, redeemerId, otherId] = personIds
       if (!ownerId || !redeemerId || !otherId) throw new Error("Missing person")
 
-      const owner = appRouter.createCaller({ userId: authUsers[0]!.id })
-      const redeemer = appRouter.createCaller({ userId: authUsers[1]!.id })
-      const other = appRouter.createCaller({ userId: authUsers[2]!.id })
-      const anonymous = appRouter.createCaller({ userId: null })
+      const owner = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authUsers[0]!.id,
+      })
+      const redeemer = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authUsers[1]!.id,
+      })
+      const other = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authUsers[2]!.id,
+      })
+      const anonymous = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: null,
+      })
 
       await expect(
         anonymous.pairing.create({ purpose: "connection" }),
@@ -261,10 +274,22 @@ integrationTest(
       const [ownerId, redeemerId, otherId] = ids
       if (!ownerId || !redeemerId || !otherId) throw new Error("Missing person")
 
-      const owner = appRouter.createCaller({ userId: authUsers[0]!.id })
-      const redeemer = appRouter.createCaller({ userId: authUsers[1]!.id })
-      const other = appRouter.createCaller({ userId: authUsers[2]!.id })
-      const anonymous = appRouter.createCaller({ userId: null })
+      const owner = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authUsers[0]!.id,
+      })
+      const redeemer = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authUsers[1]!.id,
+      })
+      const other = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authUsers[2]!.id,
+      })
+      const anonymous = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: null,
+      })
       const code = (await owner.pairing.create({ purpose: "connection" })).code
       const deviceId = crypto.randomUUID()
       const { error: deviceError } = await admin.from("devices").insert({

@@ -191,6 +191,27 @@ export type Database = {
           },
         ]
       }
+      pairing_redemption_failures: {
+        Row: {
+          client_prefix: unknown
+          created_at: string
+          id: number
+          person_id: string
+        }
+        Insert: {
+          client_prefix: unknown
+          created_at?: string
+          id?: never
+          person_id: string
+        }
+        Update: {
+          client_prefix?: unknown
+          created_at?: string
+          id?: never
+          person_id?: string
+        }
+        Relationships: []
+      }
       people: {
         Row: {
           animal_id: string | null
@@ -377,6 +398,19 @@ export type Database = {
         Args: { other_person_id: string }
         Returns: boolean
       }
+      redeem_pairing_code: {
+        Args: {
+          client_ip: unknown
+          pairing_code: string
+          pairing_purpose: string
+          redeemer_id: string
+          ttl_seconds: number
+        }
+        Returns: {
+          outcome: string
+          owner_person_id: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
@@ -512,4 +546,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

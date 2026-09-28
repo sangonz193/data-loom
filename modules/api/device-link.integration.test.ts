@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js"
 import { expect, test } from "bun:test"
 import { subMinutes } from "date-fns"
 
+import { fixtureClientIp } from "@/modules/api/fixture-client-ip"
 import { canonicalConnectionIds } from "@/modules/connections/create/connection-ids"
 import type { Database } from "@/supabase/types"
 import { createAdminClient } from "@/utils/supabase/admin"
@@ -40,7 +41,10 @@ class Fixture {
   }
 
   caller(authId: string | null) {
-    return appRouter.createCaller({ userId: authId })
+    return appRouter.createCaller({
+      clientIp: fixtureClientIp(),
+      userId: authId,
+    })
   }
 
   async permanentUser(label: string) {
