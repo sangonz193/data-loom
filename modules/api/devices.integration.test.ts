@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
 
+import { fixtureClientIp } from "@/modules/api/fixture-client-ip"
 import { createAdminClient } from "@/utils/supabase/admin"
 
 import { appRouter } from "./router"
@@ -44,9 +45,18 @@ integrationTest(
       const [firstPersonId, secondPersonId] = personIds
       if (!firstPersonId || !secondPersonId) throw new Error("Missing person")
 
-      const first = appRouter.createCaller({ userId: authUsers[0]!.id })
-      const second = appRouter.createCaller({ userId: authUsers[1]!.id })
-      const anonymous = appRouter.createCaller({ userId: null })
+      const first = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authUsers[0]!.id,
+      })
+      const second = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authUsers[1]!.id,
+      })
+      const anonymous = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: null,
+      })
       const id = crypto.randomUUID()
 
       await expect(anonymous.devices.register({ id })).rejects.toMatchObject({
@@ -193,9 +203,16 @@ integrationTest(
       })
       if (!ownerId || !otherId) throw new Error("Missing person")
 
-      const owner = appRouter.createCaller({ userId: authUsers[0]!.id })
-      const anonymous = appRouter.createCaller({ userId: null })
+      const owner = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authUsers[0]!.id,
+      })
+      const anonymous = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: null,
+      })
       const withoutPerson = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
         userId: crypto.randomUUID(),
       })
       const [

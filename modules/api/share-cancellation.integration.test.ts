@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
 
+import { fixtureClientIp } from "@/modules/api/fixture-client-ip"
 import { canonicalConnectionIds } from "@/modules/connections/create/connection-ids"
 import { createAdminClient } from "@/utils/supabase/admin"
 
@@ -74,10 +75,22 @@ integrationTest(
       ])
       if (deviceError) throw deviceError
 
-      const sender = appRouter.createCaller({ userId: authIds[0]! })
-      const recipient = appRouter.createCaller({ userId: authIds[1]! })
-      const stranger = appRouter.createCaller({ userId: authIds[2]! })
-      const anonymous = appRouter.createCaller({ userId: null })
+      const sender = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authIds[0]!,
+      })
+      const recipient = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authIds[1]!,
+      })
+      const stranger = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authIds[2]!,
+      })
+      const anonymous = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: null,
+      })
       const payload = {
         files: [{ name: "example.txt", size: 1, mimeType: "text/plain" }],
       }

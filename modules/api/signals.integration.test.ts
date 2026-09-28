@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import { expect, test } from "bun:test"
 import { subMinutes } from "date-fns"
 
+import { fixtureClientIp } from "@/modules/api/fixture-client-ip"
 import { canonicalConnectionIds } from "@/modules/connections/create/connection-ids"
 import { createAdminClient } from "@/utils/supabase/admin"
 
@@ -44,10 +45,22 @@ integrationTest(
       })
       const [ownerId, redeemerId, thirdId] = ids
       if (!ownerId || !redeemerId || !thirdId) throw new Error("Missing person")
-      const owner = appRouter.createCaller({ userId: authUsers[0]!.id })
-      const redeemer = appRouter.createCaller({ userId: authUsers[1]!.id })
-      const third = appRouter.createCaller({ userId: authUsers[2]!.id })
-      const unauthenticated = appRouter.createCaller({ userId: null })
+      const owner = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authUsers[0]!.id,
+      })
+      const redeemer = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authUsers[1]!.id,
+      })
+      const third = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authUsers[2]!.id,
+      })
+      const unauthenticated = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: null,
+      })
       const offer = { type: "offer" as const, sdp: "v=0\r\n" }
       const answer = { type: "answer" as const, sdp: "v=0\r\n" }
       const candidate = {

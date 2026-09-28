@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js"
 import { expect, test } from "bun:test"
 import { assign, createActor, fromCallback, fromPromise, waitFor } from "xstate"
 
+import { fixtureClientIp } from "@/modules/api/fixture-client-ip"
 import { canonicalConnectionIds } from "@/modules/connections/create/connection-ids"
 import { connectionMachine } from "@/modules/connections/item/machine"
 import type { Database } from "@/supabase/types"
@@ -98,10 +99,22 @@ integrationTest(
       ])
       if (deviceError) throw deviceError
 
-      const sender = appRouter.createCaller({ userId: authUsers[0]!.id })
-      const recipient = appRouter.createCaller({ userId: authUsers[1]!.id })
-      const stranger = appRouter.createCaller({ userId: authUsers[2]!.id })
-      const anonymous = appRouter.createCaller({ userId: null })
+      const sender = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authUsers[0]!.id,
+      })
+      const recipient = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authUsers[1]!.id,
+      })
+      const stranger = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: authUsers[2]!.id,
+      })
+      const anonymous = appRouter.createCaller({
+        clientIp: fixtureClientIp(),
+        userId: null,
+      })
       const payload = {
         files: [{ name: "hello.txt", size: 5, mimeType: "text/plain" }],
       }
