@@ -1,3 +1,5 @@
+import "../radix-test-setup"
+
 import { AuthApiError, type User } from "@supabase/supabase-js"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { createTRPCClient, httpLink } from "@trpc/client"
