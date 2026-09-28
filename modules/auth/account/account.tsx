@@ -11,6 +11,8 @@ import { createClient } from "@/utils/supabase/client"
 import { authTransitions, runAuthTransition } from "../auth-transition"
 import { useUser } from "../use-user"
 import { AddDevice } from "./add-device"
+import { Devices } from "./devices"
+import { RequiredAuthClient } from "../required"
 
 export function Account({ confirmation }: { confirmation?: string }) {
   const user = useUser()
@@ -202,6 +204,9 @@ export function Account({ confirmation }: { confirmation?: string }) {
           >
             Sign out of this browser
           </Button>
+          <RequiredAuthClient user={user}>
+            <Devices />
+          </RequiredAuthClient>
           <AddDevice email={user.email} />
         </section>
       : <section

@@ -7,6 +7,7 @@ import { useIdentityDevice } from "@/modules/auth/use-identity-device"
 import { useRequiredUser } from "@/modules/auth/use-user"
 import { createClient } from "@/utils/supabase/client"
 
+import { deviceNameFromUserAgent } from "./device-name"
 import { registerDevice } from "./register-device"
 
 async function readUserId() {
@@ -21,7 +22,10 @@ export function useDevice() {
   const register = useCallback(
     () =>
       registerDevice(userId, (id) =>
-        trpcClient.devices.register.mutate({ id }),
+        trpcClient.devices.register.mutate({
+          id,
+          name: deviceNameFromUserAgent(navigator.userAgent),
+        }),
       ),
     [trpcClient, userId],
   )
